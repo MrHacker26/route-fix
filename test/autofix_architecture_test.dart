@@ -39,8 +39,9 @@ void main() {
   });
 
   test('factory selects a PlatformFixProvider for this host', () {
-    final provider = const PlatformFixProviderFactory().create();
+    final FixProvider provider = const PlatformFixProviderFactory().create();
     expect(provider, isA<PlatformFixProvider>());
+    expect(provider, isA<FixProvider>());
     expect(provider.availableActions(), isNotEmpty);
   });
 }

@@ -18,6 +18,9 @@ enum FixPlatform {
   linux,
   macOS,
   windows,
+
+  /// Host OS is not a known Auto Fix target (reserved for future platforms).
+  unsupported,
 }
 
 /// Availability of an action on the current host.
