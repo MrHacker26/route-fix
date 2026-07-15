@@ -48,7 +48,7 @@ final class DefaultAutoFixService implements AutoFixService {
       final kind = type.toFixActionKind ?? FixActionKind.disableIpv6;
       return FixResult.failure(
         kind,
-        message: 'Another fix is already being applied.',
+        message: 'Another change is already in progress.',
         executed: false,
         platform: platform,
       );
@@ -59,7 +59,7 @@ final class DefaultAutoFixService implements AutoFixService {
       if (platform == FixPlatform.unsupported) {
         return FixResult.failure(
           kind,
-          message: 'Auto Fix is not available on this platform.',
+          message: 'Auto Fix isn’t available here.',
           executed: false,
           platform: platform,
         );
@@ -131,7 +131,7 @@ final class DefaultAutoFixService implements AutoFixService {
     if (_busy) {
       return FixResult.failure(
         FixActionKind.enableIpv6,
-        message: 'Another fix is already being applied.',
+        message: 'Another change is already in progress.',
         executed: false,
         platform: platform,
       );
@@ -145,7 +145,7 @@ final class DefaultAutoFixService implements AutoFixService {
       if (!_executor.supports(FixType.restoreDefault)) {
         return FixResult.failure(
           FixActionKind.enableIpv6,
-          message: 'Restore is not available on this platform.',
+          message: 'Restore isn’t available here.',
           executed: false,
           platform: platform,
         );

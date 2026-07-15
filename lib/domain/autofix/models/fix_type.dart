@@ -57,12 +57,12 @@ extension FixTypeCatalogMapping on FixType {
   /// Calm, user-facing title — never “Disable IPv6” for [preferIpv4].
   String get displayTitle => switch (this) {
         FixType.preferIpv4 => 'Prefer IPv4',
-        FixType.restoreDefault => 'Restore Default Network Configuration',
-        FixType.flushDnsCache => 'Flush DNS Cache',
+        FixType.restoreDefault => 'Restore defaults',
+        FixType.flushDnsCache => 'Flush DNS',
         FixType.changeDnsCloudflare => 'Use Cloudflare DNS',
-        FixType.enableWarp => 'Enable Cloudflare WARP',
-        FixType.renewDhcpLease => 'Renew DHCP Lease',
-        FixType.restartNetworkInterface => 'Restart Network Interface',
-        FixType.resetNetworkStack => 'Reset Network Stack',
+        FixType.enableWarp => 'Open WARP',
+        FixType.renewDhcpLease => 'Renew DHCP',
+        FixType.restartNetworkInterface => 'Restart interface',
+        FixType.resetNetworkStack => 'Reset network stack',
       };
 }

@@ -1,19 +1,91 @@
 import '../../core/abstractions/result.dart';
 
-/// User / app preference flags. No implementation.
+/// User preferences for RouteFix.
 abstract interface class SettingsRepository {
   Future<Result<AppSettings>> getSettings();
 
   Future<Result<void>> saveSettings(AppSettings settings);
 }
 
-/// Settings snapshot (domain shape only).
+/// Appearance preference stored in settings.
+enum AppAppearance {
+  dark,
+  system,
+}
+
+/// Lightweight preference snapshot.
 class AppSettings {
   const AppSettings({
     this.hasCompletedOnboarding = false,
+    this.appearance = AppAppearance.dark,
+    this.diagnosticsTimeoutSeconds = 8,
+    this.autoRerunAfterFixes = true,
+    this.showTechnicalDetailsByDefault = false,
     this.preferredDnsHint,
   });
 
   final bool hasCompletedOnboarding;
+  final AppAppearance appearance;
+
+  /// Per-probe timeout used by diagnostics (5–30s).
+  final int diagnosticsTimeoutSeconds;
+
+  /// Re-run diagnostics after a successful Auto Fix.
+  final bool autoRerunAfterFixes;
+
+  /// Expand Technical details sections on first open.
+  final bool showTechnicalDetailsByDefault;
+
   final String? preferredDnsHint;
+
+  Duration get diagnosticsTimeout =>
+      Duration(seconds: diagnosticsTimeoutSeconds.clamp(5, 30));
+
+  AppSettings copyWith({
+    bool? hasCompletedOnboarding,
+    AppAppearance? appearance,
+    int? diagnosticsTimeoutSeconds,
+    bool? autoRerunAfterFixes,
+    bool? showTechnicalDetailsByDefault,
+    String? preferredDnsHint,
+  }) {
+    return AppSettings(
+      hasCompletedOnboarding:
+          hasCompletedOnboarding ?? this.hasCompletedOnboarding,
+      appearance: appearance ?? this.appearance,
+      diagnosticsTimeoutSeconds:
+          diagnosticsTimeoutSeconds ?? this.diagnosticsTimeoutSeconds,
+      autoRerunAfterFixes: autoRerunAfterFixes ?? this.autoRerunAfterFixes,
+      showTechnicalDetailsByDefault:
+          showTechnicalDetailsByDefault ?? this.showTechnicalDetailsByDefault,
+      preferredDnsHint: preferredDnsHint ?? this.preferredDnsHint,
+    );
+  }
+
+  Map<String, Object?> toJson() => {
+        'hasCompletedOnboarding': hasCompletedOnboarding,
+        'appearance': appearance.name,
+        'diagnosticsTimeoutSeconds': diagnosticsTimeoutSeconds,
+        'autoRerunAfterFixes': autoRerunAfterFixes,
+        'showTechnicalDetailsByDefault': showTechnicalDetailsByDefault,
+        if (preferredDnsHint != null) 'preferredDnsHint': preferredDnsHint,
+      };
+
+  factory AppSettings.fromJson(Map<String, dynamic> json) {
+    final appearanceName = json['appearance'] as String?;
+    final appearance = AppAppearance.values.firstWhere(
+      (value) => value.name == appearanceName,
+      orElse: () => AppAppearance.dark,
+    );
+    final timeout = json['diagnosticsTimeoutSeconds'];
+    return AppSettings(
+      hasCompletedOnboarding: json['hasCompletedOnboarding'] as bool? ?? false,
+      appearance: appearance,
+      diagnosticsTimeoutSeconds: timeout is int ? timeout.clamp(5, 30) : 8,
+      autoRerunAfterFixes: json['autoRerunAfterFixes'] as bool? ?? true,
+      showTechnicalDetailsByDefault:
+          json['showTechnicalDetailsByDefault'] as bool? ?? false,
+      preferredDnsHint: json['preferredDnsHint'] as String?,
+    );
+  }
 }

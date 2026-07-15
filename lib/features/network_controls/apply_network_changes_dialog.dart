@@ -39,10 +39,10 @@ class ApplyNetworkChangesDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Apply Network Changes?', style: text.titleLarge),
+              Text('Apply changes?', style: text.titleLarge),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'RouteFix will modify your system network configuration.',
+                'This updates your system network settings.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,
@@ -50,7 +50,7 @@ class ApplyNetworkChangesDialog extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Administrator permission may be required.',
+                'You may be asked for your password.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,
@@ -58,7 +58,7 @@ class ApplyNetworkChangesDialog extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'These changes can be reverted at any time.',
+                'You can undo this anytime.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,

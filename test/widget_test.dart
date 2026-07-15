@@ -8,10 +8,17 @@ import 'package:route_fix/features/diagnostics/diagnostics_page.dart';
 import 'package:route_fix/features/diagnostics/diagnostics_result_page.dart';
 import 'package:route_fix/features/onboarding/onboarding_page.dart';
 import 'package:route_fix/main.dart';
+import 'package:route_fix/features/settings/app_settings_controller.dart';
+import 'package:route_fix/domain/repositories/settings_repository.dart';
+import 'package:route_fix/core/abstractions/result.dart';
 
 void main() {
   testWidgets('App opens onboarding', (WidgetTester tester) async {
-    await tester.pumpWidget(const RouteFixApp());
+    final settings = AppSettingsController(
+      repository: _MemorySettingsRepository(),
+    );
+    await settings.load();
+    await tester.pumpWidget(RouteFixApp(settings: settings));
 
     expect(find.byType(OnboardingPage), findsOneWidget);
     expect(find.text('Continue'), findsOneWidget);
@@ -33,17 +40,16 @@ void main() {
       ),
     );
 
-    expect(find.text('Investigating'), findsOneWidget);
-    expect(find.text('Checking network health…'), findsOneWidget);
+    expect(find.text('Scanning your network'), findsOneWidget);
 
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
 
     expect(find.text('RouteFix'), findsWidgets);
-    expect(find.text('Run Scan'), findsOneWidget);
-    expect(find.text('Health Summary'), findsOneWidget);
-    expect(find.text('Network Snapshot'), findsOneWidget);
+    expect(find.text('Scan'), findsOneWidget);
+    expect(find.text('Health'), findsOneWidget);
+    expect(find.text('Network'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Recommendation'),
@@ -51,22 +57,22 @@ void main() {
       scrollable: find.byType(Scrollable).first,
     );
     expect(find.text('Recommendation'), findsOneWidget);
-    expect(find.text('Recent Scan'), findsOneWidget);
+    expect(find.text('Recent scan'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.textContaining('Developer'),
       80,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Developer Services'), findsOneWidget);
+    expect(find.text('Developer services'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Technical Details'),
+      find.text('Technical details'),
       80,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Technical Details'), findsOneWidget);
-    expect(find.text('Everything looks healthy.'), findsOneWidget);
+    expect(find.text('Technical details'), findsOneWidget);
+    expect(find.text('All clear.'), findsOneWidget);
   });
 
   testWidgets('Dashboard shows retry when coordinator fails', (
@@ -82,7 +88,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
 
-    expect(find.text('Unable to load health report'), findsOneWidget);
+    expect(find.text('Couldn’t load health report'), findsOneWidget);
     expect(find.text('Try again'), findsOneWidget);
   });
 
@@ -156,11 +162,11 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1100));
 
     expect(find.text('Results'), findsOneWidget);
-    expect(find.text('Health Summary'), findsWidgets);
-    expect(find.text('Network Snapshot'), findsOneWidget);
+    expect(find.text('Health'), findsWidgets);
+    expect(find.text('Network'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Problem'),
+      find.text('GitHub took longer than expected'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
@@ -170,11 +176,11 @@ void main() {
     expect(find.text('Impact'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Technical details'),
+      find.text('DNS · TCP · TLS · HTTP · Rules'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('View technical details'), findsOneWidget);
+    expect(find.text('Technical details'), findsWidgets);
   });
 
   testWidgets('Results screen handles empty report calmly', (WidgetTester tester) async {
@@ -200,18 +206,18 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.scrollUntilVisible(
-      find.text('Problem'),
+      find.text('All clear'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Everything looks healthy'), findsWidgets);
+    expect(find.text('All clear'), findsWidgets);
 
     await tester.scrollUntilVisible(
       find.text('Recommendation'),
       120,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('No recommendation available.'), findsOneWidget);
+    expect(find.text('No fix recommended'), findsOneWidget);
   });
 
   testWidgets('Results screen shows retry when load fails', (WidgetTester tester) async {
@@ -224,7 +230,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 50));
     await tester.pumpAndSettle();
 
-    expect(find.text('Something got in the way'), findsOneWidget);
+    expect(find.text('Something went wrong'), findsOneWidget);
     expect(find.text('Try again'), findsOneWidget);
   });
 }
@@ -271,5 +277,18 @@ class _FailingCoordinator implements DiagnosticsCoordinator {
   Future<DiagnosticReport> run({String hostname = 'www.cloudflare.com'}) async {
     await Future<void>.delayed(const Duration(milliseconds: 10));
     throw Exception('SocketException: Network is unreachable');
+  }
+}
+
+final class _MemorySettingsRepository implements SettingsRepository {
+  AppSettings _settings = const AppSettings();
+
+  @override
+  Future<Result<AppSettings>> getSettings() async => Success(_settings);
+
+  @override
+  Future<Result<void>> saveSettings(AppSettings settings) async {
+    _settings = settings;
+    return const Success(null);
   }
 }

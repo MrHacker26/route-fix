@@ -10,7 +10,11 @@ import '../probe_failure_mapper.dart';
 
 /// DNS hostname resolution via `dart:io` [InternetAddress.lookup].
 class DartIoDnsLookupService implements DnsLookupService {
-  const DartIoDnsLookupService();
+  const DartIoDnsLookupService({
+    this.timeout = const Duration(seconds: 10),
+  });
+
+  final Duration timeout;
 
   @override
   Future<Result<DnsLookupResult>> lookup(String hostname) async {
@@ -28,7 +32,7 @@ class DartIoDnsLookupService implements DnsLookupService {
           await Future.wait<({List<String> addresses, AppFailure? failure})>([
         ipv4Future,
         ipv6Future,
-      ]).timeout(const Duration(seconds: 10));
+      ]).timeout(timeout);
 
       stopwatch.stop();
 

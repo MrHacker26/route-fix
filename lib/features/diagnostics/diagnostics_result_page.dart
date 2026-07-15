@@ -102,7 +102,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
         _error = HumanMessage.fromProbeError(
           error.toString(),
           fallback:
-              'We couldn’t finish this check. Give it another try in a moment.',
+              'Couldn’t finish this scan. Try again.',
         );
       });
       _entrance
@@ -198,9 +198,9 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                                     ),
                                     Text(
                                       _loading
-                                          ? 'Listening to your network…'
+                                          ? 'Scanning…'
                                           : _error != null
-                                              ? 'Couldn’t complete this check'
+                                              ? 'Scan incomplete'
                                               : '${data?.timestampLabel ?? ''} · RouteFix',
                                       style: text.labelSmall?.copyWith(
                                         color: AppColors.onSurfaceVariant,
@@ -211,11 +211,11 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                               ),
                               StatusBadge(
                                 label: _loading
-                                    ? 'Investigating'
+                                    ? 'Scanning'
                                     : _error != null
-                                        ? 'Needs Attention'
+                                        ? 'Attention'
                                         : _partial
-                                            ? 'Needs Attention'
+                                            ? 'Attention'
                                             : 'Healthy',
                                 tone: _loading
                                     ? StatusBadgeTone.info
@@ -236,23 +236,26 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                         ),
                         const SizedBox(height: AppSpacing.md),
                         if (_loading) ...[
-                          const _LoadingCard(
-                            label: 'Checking how healthy your routes feel…',
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          const _LoadingCard(
-                            label: 'Comparing everyday developer paths…',
-                          ),
-                          const SizedBox(height: AppSpacing.sm),
-                          const _LoadingCard(
-                            label: 'Preparing a calm recommendation…',
+                          FeedbackState.loading(
+                            title: 'Preparing results',
+                            body: 'Gathering paths and service timings.',
                           ),
                         ] else if (_error != null) ...[
-                          _ErrorCard(
-                            message: _error!,
-                            technical: _errorTechnical,
-                            onRetry: _load,
+                          FeedbackState.error(
+                            title: 'Something went wrong',
+                            body: _error!,
+                            onAction: _load,
                           ),
+                          if (_errorTechnical != null &&
+                              _errorTechnical!.isNotEmpty) ...[
+                            const SizedBox(height: AppSpacing.sm),
+                            _TechnicalExpander(details: [
+                              TechnicalDetailView(
+                                label: 'raw_error',
+                                value: _errorTechnical!,
+                              ),
+                            ]),
+                          ],
                         ] else if (data != null) ...[
                           ..._staggered([
                             _HealthSection(data: data),
@@ -335,85 +338,6 @@ class _SectionEyebrow extends StatelessWidget {
   }
 }
 
-class _LoadingCard extends StatelessWidget {
-  const _LoadingCard({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      child: Row(
-        children: [
-          const SizedBox(
-            width: AppSpacing.iconRow,
-            height: AppSpacing.iconRow,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Text(
-              label,
-              style: AppTypography.textTheme.bodyMedium?.copyWith(
-                color: AppColors.onSurfaceVariant,
-                height: 1.4,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ErrorCard extends StatelessWidget {
-  const _ErrorCard({
-    required this.message,
-    required this.onRetry,
-    this.technical,
-  });
-
-  final String message;
-  final String? technical;
-  final VoidCallback onRetry;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppTypography.textTheme;
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Something got in the way', style: text.titleMedium),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            message,
-            style: text.bodyMedium?.copyWith(
-              color: AppColors.onSurfaceVariant,
-              height: 1.5,
-            ),
-          ),
-          if (technical != null && technical!.isNotEmpty) ...[
-            const SizedBox(height: AppSpacing.md),
-            _TechnicalExpander(details: [
-              TechnicalDetailView(label: 'raw_error', value: technical!),
-            ]),
-          ],
-          const SizedBox(height: AppSpacing.lg),
-          SecondaryButton(
-            label: 'Try again',
-            icon: Icons.refresh_rounded,
-            onPressed: onRetry,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
 class _HealthSection extends StatelessWidget {
   const _HealthSection({required this.data});
 
@@ -433,7 +357,7 @@ class _HealthSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionEyebrow('Health Summary'),
+        const _SectionEyebrow('Health'),
         const SizedBox(height: AppSpacing.xs),
         GlassCard(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -478,12 +402,12 @@ class _HealthSection extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _ResultMetaRow(
-                          label: 'Health Score',
+                          label: 'Score',
                           value: '$score',
                         ),
                         const SizedBox(height: AppSpacing.xxs),
                         _ResultMetaRow(
-                          label: 'Overall Status',
+                          label: 'Status',
                           value: data.scoreLabel,
                         ),
                         const SizedBox(height: AppSpacing.xxs),
@@ -493,7 +417,7 @@ class _HealthSection extends StatelessWidget {
                         ),
                         const SizedBox(height: AppSpacing.xxs),
                         _ResultMetaRow(
-                          label: 'Last Scan',
+                          label: 'Last scan',
                           value: data.timestampLabel,
                         ),
                         const SizedBox(height: AppSpacing.sm),
@@ -573,7 +497,7 @@ class _NetworkSnapshotSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionEyebrow('Network Snapshot'),
+        const _SectionEyebrow('Network'),
         const SizedBox(height: AppSpacing.xs),
         GlassCard(
           padding: const EdgeInsets.all(AppSpacing.md),
@@ -693,60 +617,43 @@ class _ProblemSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionEyebrow('Problem'),
+        const _SectionEyebrow('Findings'),
         const SizedBox(height: AppSpacing.sm),
         GlassCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    problems.isEmpty
-                        ? 'Everything looks healthy'
-                        : 'What we noticed',
-                    style: text.titleMedium,
-                  ),
-                  const Spacer(),
-                  StatusBadge(
-                    label: problems.isEmpty ? 'Healthy' : '${problems.length}',
-                    tone: problems.isEmpty
-                        ? StatusBadgeTone.success
-                        : StatusBadgeTone.warning,
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.md),
-              if (problems.isEmpty)
-                Column(
-                  children: [
-                    Icon(
-                      Icons.check_circle_outline_rounded,
-                      size: 36,
-                      color: AppColors.success.withValues(alpha: 0.9),
-                    ),
-                    const SizedBox(height: AppSpacing.sm),
-                    Text(
-                      'We couldn’t find any routing issues during this scan.',
-                      textAlign: TextAlign.center,
-                      style: text.bodyMedium?.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
+          child: problems.isEmpty
+              ? FeedbackState.empty(
+                  title: 'All clear',
+                  body: 'No routing issues in this scan.',
+                  compact: true,
+                  framed: false,
                 )
-              else
-                for (var i = 0; i < problems.length; i++) ...[
-                  if (i > 0) ...[
-                    const SizedBox(height: AppSpacing.sm),
-                    const Divider(height: 1, color: AppColors.outlineSubtle),
-                    const SizedBox(height: AppSpacing.sm),
+              : Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text('Findings', style: text.titleMedium),
+                        const Spacer(),
+                        StatusBadge(
+                          label: '${problems.length}',
+                          tone: StatusBadgeTone.warning,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: AppSpacing.md),
+                    for (var i = 0; i < problems.length; i++) ...[
+                      if (i > 0) ...[
+                        const SizedBox(height: AppSpacing.sm),
+                        const Divider(
+                          height: 1,
+                          color: AppColors.outlineSubtle,
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                      ],
+                      _ProblemRow(problem: problems[i]),
+                    ],
                   ],
-                  _ProblemRow(problem: problems[i]),
-                ],
-            ],
-          ),
+                ),
         ),
       ],
     );
@@ -823,10 +730,10 @@ class _ImpactSection extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Where you might feel it', style: text.titleMedium),
+              Text('Where it may show up', style: text.titleMedium),
               const SizedBox(height: AppSpacing.xxs),
               Text(
-                'A calm estimate for common developer workflows.',
+                'Based on what this scan measured.',
                 style: text.bodySmall?.copyWith(
                   color: AppColors.onSurfaceVariant,
                 ),
@@ -901,21 +808,11 @@ class _RecommendationSection extends StatelessWidget {
         const _SectionEyebrow('Recommendation'),
         const SizedBox(height: AppSpacing.sm),
         if (primary == null)
-          GlassCard(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('No recommendation available.', style: text.titleMedium),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  'No action required. We’ll only recommend a fix when we have strong evidence.',
-                  style: text.bodyMedium?.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                    height: 1.5,
-                  ),
-                ),
-              ],
-            ),
+          FeedbackState.empty(
+            title: 'No fix recommended',
+            body:
+                'Nothing to change. Fixes appear only with strong evidence.',
+            icon: Icons.verified_outlined,
           )
         else ...[
           RecommendedFixCard(
@@ -927,10 +824,10 @@ class _RecommendationSection extends StatelessWidget {
           ),
           if (secondary.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.lg),
-            Text('Other possible actions', style: text.titleSmall),
+            Text('Other options', style: text.titleSmall),
             const SizedBox(height: AppSpacing.xxs),
             Text(
-              'Optional ideas that may help in related cases.',
+              'Optional steps that may help.',
               style: text.bodySmall?.copyWith(
                 color: AppColors.onSurfaceVariant,
               ),
@@ -986,14 +883,18 @@ class _TechnicalDetailsSection extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Grouped by DNS · TCP · TLS · HTTP · Rules.',
+                'DNS · TCP · TLS · HTTP · Rules',
                 style: AppTypography.textTheme.bodySmall?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.4,
                 ),
               ),
               const SizedBox(height: AppSpacing.md),
-              _TechnicalExpander(details: details),
+              _TechnicalExpander(
+                details: details,
+                initiallyExpanded:
+                    AppServices.settings.settings.showTechnicalDetailsByDefault,
+              ),
             ],
           ),
         ),
@@ -1003,9 +904,13 @@ class _TechnicalDetailsSection extends StatelessWidget {
 }
 
 class _TechnicalExpander extends StatefulWidget {
-  const _TechnicalExpander({required this.details});
+  const _TechnicalExpander({
+    required this.details,
+    this.initiallyExpanded = false,
+  });
 
   final List<TechnicalDetailView> details;
+  final bool initiallyExpanded;
 
   @override
   State<_TechnicalExpander> createState() => _TechnicalExpanderState();
@@ -1013,7 +918,7 @@ class _TechnicalExpander extends StatefulWidget {
 
 class _TechnicalExpanderState extends State<_TechnicalExpander>
     with SingleTickerProviderStateMixin {
-  var _expanded = false;
+  late var _expanded = widget.initiallyExpanded;
   late final AnimationController _chevron;
 
   @override
@@ -1022,6 +927,7 @@ class _TechnicalExpanderState extends State<_TechnicalExpander>
     _chevron = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
+      value: _expanded ? 1 : 0,
     );
   }
 
@@ -1064,7 +970,7 @@ class _TechnicalExpanderState extends State<_TechnicalExpander>
               children: [
                 Expanded(
                   child: Text(
-                    'View technical details',
+                    'Technical details',
                     style: text.titleSmall?.copyWith(
                       color: AppColors.primary,
                       fontWeight: FontWeight.w600,
@@ -1098,11 +1004,12 @@ class _TechnicalExpanderState extends State<_TechnicalExpander>
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 if (details.isEmpty)
-                  Text(
-                    'No details for this run.',
-                    style: text.bodySmall?.copyWith(
-                      color: AppColors.onSurfaceMuted,
-                    ),
+                  FeedbackState.empty(
+                    title: 'No details',
+                    body: 'Nothing recorded for this scan.',
+                    icon: Icons.notes_outlined,
+                    compact: true,
+                    framed: false,
                   )
                 else
                   for (final detail in details)

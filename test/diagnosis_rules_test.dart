@@ -53,7 +53,7 @@ void main() {
 
       expect(result.failed, isTrue);
       expect(result.recommendation, isNotNull);
-      expect(result.recommendation?.actionLabel, 'Disable IPv6');
+      expect(result.recommendation?.actionLabel, 'Prefer IPv4');
       expect(result.confidence, greaterThanOrEqualTo(0.85));
     });
 

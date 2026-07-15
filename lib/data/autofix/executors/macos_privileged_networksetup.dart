@@ -165,11 +165,9 @@ final class MacOsPrivilegedNetworksetup {
     final lower = stderr.toLowerCase();
     if (lower.contains('username or password was incorrect') ||
         lower.contains('-60005')) {
-      return 'macOS couldn’t verify your administrator password. '
-          'When the password dialog appears, enter your Mac login password and try again.';
+      return 'Password wasn’t accepted. Try again when prompted.';
     }
-    return 'Administrator permission is required to change network settings. '
-        'Approve the macOS password dialog when it appears.';
+    return 'Admin access is required. Approve when prompted.';
   }
 
   static void _validateFlag(String flag) {

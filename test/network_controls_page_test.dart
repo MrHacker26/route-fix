@@ -49,17 +49,16 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Network Controls'), findsOneWidget);
-    expect(find.text('Network Configuration'), findsOneWidget);
-    expect(find.text('Manually control network preferences.'), findsOneWidget);
-    expect(find.text('Automatic (Recommended)'), findsOneWidget);
+    expect(find.text('Network'), findsOneWidget);
+    expect(find.text('Choose how this device prefers network paths.'), findsOneWidget);
+    expect(find.text('Automatic'), findsWidgets);
     expect(find.text('Prefer IPv4'), findsOneWidget);
     expect(find.text('Disable IPv6'), findsOneWidget);
-    expect(find.text('Apply Changes'), findsOneWidget);
-    expect(find.text('Restore Defaults'), findsOneWidget);
-    expect(find.text('Automatic'), findsWidgets);
+    expect(find.text('Apply'), findsOneWidget);
+    expect(find.text('Restore defaults'), findsOneWidget);
 
     final apply = tester.widget<PrimaryButton>(
-      find.widgetWithText(PrimaryButton, 'Apply Changes'),
+      find.widgetWithText(PrimaryButton, 'Apply'),
     );
     expect(apply.onPressed, isNull);
 
@@ -67,7 +66,7 @@ void main() {
     await tester.pumpAndSettle();
 
     final applyAfter = tester.widget<PrimaryButton>(
-      find.widgetWithText(PrimaryButton, 'Apply Changes'),
+      find.widgetWithText(PrimaryButton, 'Apply'),
     );
     expect(applyAfter.onPressed, isNotNull);
   });

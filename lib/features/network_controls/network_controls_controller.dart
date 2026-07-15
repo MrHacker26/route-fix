@@ -75,7 +75,7 @@ final class NetworkControlsController {
     if (!hasPendingChanges || _applying) {
       return FixResult.failure(
         FixActionKind.disableIpv6,
-        message: 'No network changes to apply.',
+        message: 'Nothing to apply.',
         executed: false,
         platform: _autoFix.platform,
       );
@@ -94,7 +94,7 @@ final class NetworkControlsController {
           ),
         Ipv6Preference.unknown => FixResult.failure(
             FixActionKind.disableIpv6,
-            message: 'Choose a valid network preference first.',
+            message: 'Choose a preference first.',
             executed: false,
             platform: _autoFix.platform,
           ),

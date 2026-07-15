@@ -99,7 +99,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         _failureTechnical = error.toString();
         _failureMessage = HumanMessage.fromProbeError(
           error.toString(),
-          fallback: 'We couldn’t update network preferences.',
+          fallback: 'Couldn’t update preferences.',
         );
       });
       return;
@@ -113,7 +113,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         _failureMessage = null;
         _failureTechnical = null;
       } else if (result.success) {
-        _successMessage = 'Network configuration updated successfully.';
+        _successMessage = 'Settings updated.';
         _failureMessage = null;
         _failureTechnical = null;
       } else {
@@ -124,12 +124,14 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         ].where((part) => part.trim().isNotEmpty).join('\n');
         _failureMessage = HumanMessage.fromProbeError(
           result.message ?? result.error,
-          fallback: 'That change didn’t go through. You can try again.',
+          fallback: 'That change didn’t go through. Try again.',
         );
       }
     });
     if (result.success) {
-      _runDiagnostics();
+      if (AppServices.settings.settings.autoRerunAfterFixes) {
+        _runDiagnostics();
+      }
     }
   }
 
@@ -162,7 +164,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         _failureTechnical = error.toString();
         _failureMessage = HumanMessage.fromProbeError(
           error.toString(),
-          fallback: 'We couldn’t restore defaults.',
+          fallback: 'Couldn’t restore defaults.',
         );
       });
       return;
@@ -176,7 +178,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         _failureMessage = null;
         _failureTechnical = null;
       } else if (result.success) {
-        _successMessage = 'Network configuration updated successfully.';
+        _successMessage = 'Settings updated.';
         _failureMessage = null;
         _failureTechnical = null;
       } else {
@@ -186,12 +188,14 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         ].where((part) => part.trim().isNotEmpty).join('\n');
         _failureMessage = HumanMessage.fromProbeError(
           result.message ?? result.error,
-          fallback: 'Restore didn’t complete. You can try again.',
+          fallback: 'Restore didn’t finish. Try again.',
         );
       }
     });
     if (result.success) {
-      _runDiagnostics();
+      if (AppServices.settings.settings.autoRerunAfterFixes) {
+        _runDiagnostics();
+      }
     }
   }
 
@@ -260,7 +264,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              'Network Configuration',
+                                              'Network',
                                               style: text.titleLarge?.copyWith(
                                                 fontWeight: FontWeight.w600,
                                               ),
@@ -269,7 +273,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                               height: AppSpacing.xxs,
                                             ),
                                             Text(
-                                              'Manually control network preferences.',
+                                              'Choose how this device prefers network paths.',
                                               style: text.bodyMedium?.copyWith(
                                                 color:
                                                     AppColors.onSurfaceVariant,
@@ -327,33 +331,9 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                               const SizedBox(
                                                 height: AppSpacing.md,
                                               ),
-                                              Row(
-                                                children: [
-                                                  const SizedBox(
-                                                    width:
-                                                        AppSpacing.iconRow,
-                                                    height:
-                                                        AppSpacing.iconRow,
-                                                    child:
-                                                        CircularProgressIndicator(
-                                                      strokeWidth: 2,
-                                                      color:
-                                                          AppColors.primary,
-                                                    ),
-                                                  ),
-                                                  const SizedBox(
-                                                    width: AppSpacing.sm,
-                                                  ),
-                                                  Text(
-                                                    _progressLabel ??
-                                                        'Applying…',
-                                                    style: text.bodyMedium
-                                                        ?.copyWith(
-                                                      color: AppColors
-                                                          .onSurfaceVariant,
-                                                    ),
-                                                  ),
-                                                ],
+                                              InlineProgress(
+                                                label: _progressLabel ??
+                                                    'Applying…',
                                               ),
                                             ],
                                             if (_successMessage != null) ...[
@@ -373,7 +353,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                               ),
                                               SecondaryButton(
                                                 label:
-                                                    'Run Diagnostics Again',
+                                                    'Scan again',
                                                 icon: Icons.refresh_rounded,
                                                 onPressed: _runDiagnostics,
                                               ),
@@ -407,7 +387,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                                       tilePadding:
                                                           EdgeInsets.zero,
                                                       title: Text(
-                                                        'View technical details',
+                                                        'Technical details',
                                                         style: text
                                                             .labelMedium
                                                             ?.copyWith(
@@ -459,7 +439,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                                 Expanded(
                                                   child: SecondaryButton(
                                                     label:
-                                                        'Restore Defaults',
+                                                        'Restore defaults',
                                                     icon:
                                                         Icons.undo_rounded,
                                                     expanded: true,
@@ -475,7 +455,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                                 ),
                                                 Expanded(
                                                   child: PrimaryButton(
-                                                    label: 'Apply Changes',
+                                                    label: 'Apply',
                                                     icon:
                                                         Icons.tune_rounded,
                                                     expanded: true,
@@ -496,7 +476,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                                 height: AppSpacing.md,
                                               ),
                                               Text(
-                                                'Network Controls are not available on this platform.',
+                                                'Network Controls aren’t available here.',
                                                 style: text.bodySmall
                                                     ?.copyWith(
                                                   color: AppColors
@@ -600,27 +580,10 @@ class _LoadingCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GlassCard(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      child: Row(
-        children: [
-          const SizedBox(
-            width: AppSpacing.iconRow,
-            height: AppSpacing.iconRow,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.primary,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Text(
-            'Detecting current configuration…',
-            style: AppTypography.textTheme.bodyMedium?.copyWith(
-              color: AppColors.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
+    return FeedbackState.loading(
+      title: 'Reading settings',
+      body: 'Checking current network preference.',
+      compact: true,
     );
   }
 }
@@ -658,7 +621,7 @@ class _CurrentStateRow extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Current state',
+                'Current',
                 style: text.labelSmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                   fontWeight: FontWeight.w500,

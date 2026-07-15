@@ -65,9 +65,9 @@ void main() {
       ),
     );
 
-    expect(find.text('Recommended Fix'), findsOneWidget);
+    expect(find.text('Recommended'), findsOneWidget);
     expect(find.text('Prefer IPv4'), findsOneWidget);
-    expect(find.text('Apply Fix'), findsOneWidget);
+    expect(find.text('Apply'), findsOneWidget);
   });
 
   testWidgets('success dialog then automatically reruns diagnostics',
@@ -96,14 +96,14 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Apply Fix'));
+    await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
     expect(find.text('Prefer IPv4?'), findsOneWidget);
-    await tester.tap(find.text('Apply Fix').last);
+    await tester.tap(find.text('Apply').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Network Updated'), findsWidgets);
-    await tester.tap(find.text('Done').last);
+    expect(find.text('Done'), findsWidgets);
+    await tester.tap(find.text('Close').last);
     await tester.pumpAndSettle();
     expect(rerun, isTrue);
   });
@@ -125,13 +125,13 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Apply Fix'));
+    await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Apply Fix').last);
+    await tester.tap(find.text('Apply').last);
     await tester.pumpAndSettle();
 
-    expect(find.text('Apply Fix'), findsOneWidget);
-    expect(find.text('View technical details'), findsNothing);
+    expect(find.text('Apply'), findsOneWidget);
+    expect(find.text('Technical details'), findsNothing);
   });
 
   testWidgets('failure uses human-readable message with expandable stderr',
@@ -154,9 +154,9 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Apply Fix'));
+    await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Apply Fix').last);
+    await tester.tap(find.text('Apply').last);
     await tester.pump();
 
     expect(find.textContaining('Applying'), findsWidgets);
@@ -164,7 +164,7 @@ void main() {
     completer.complete(
       FixResult.failure(
         FixActionKind.disableIpv6,
-        message: 'RouteFix needs administrator permission to continue.',
+        message: 'Admin access is required.',
         error: 'sysctl: permission denied',
         metadata: const {'stderr': 'sysctl: permission denied'},
       ),
@@ -172,10 +172,10 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(
-      find.text('RouteFix needs administrator permission to continue.'),
+      find.text('Admin access is required.'),
       findsOneWidget,
     );
-    expect(find.text('View technical details'), findsOneWidget);
+    expect(find.text('Technical details'), findsOneWidget);
   });
 
   testWidgets('cancel does not call auto fix service', (tester) async {
@@ -201,7 +201,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Apply Fix'));
+    await tester.tap(find.text('Apply'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();

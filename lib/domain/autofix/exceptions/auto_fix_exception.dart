@@ -14,15 +14,14 @@ sealed class AutoFixException implements Exception {
 
 final class AutoFixUnsupportedException extends AutoFixException {
   const AutoFixUnsupportedException([
-    String message = 'Auto Fix is not available on this platform.',
+    String message = 'Auto Fix isn’t available here.',
     String? details,
   ]) : super(message, details: details);
 }
 
 final class AutoFixPermissionException extends AutoFixException {
   const AutoFixPermissionException([
-    String message =
-        'RouteFix needs administrator permission to apply this change.',
+    String message = 'Admin access is required.',
     String? details,
   ]) : super(message, details: details);
 }
@@ -43,13 +42,13 @@ final class AutoFixExecutionException extends AutoFixException {
 
 final class AutoFixBusyException extends AutoFixException {
   const AutoFixBusyException([
-    String message = 'Another fix is already being applied.',
+    String message = 'Another change is already in progress.',
   ]) : super(message);
 }
 
 final class AutoFixNotImplementedException extends AutoFixException {
   AutoFixNotImplementedException(FixType type)
-      : super('${type.displayTitle} is planned for a future release.');
+      : super('${type.displayTitle} isn’t available yet.');
 }
 
 final class AutoFixValidationException extends AutoFixException {

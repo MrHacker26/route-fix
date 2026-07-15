@@ -46,11 +46,11 @@ final class PyPILatencyRule
       recommendation: DiagnosisEvidence.isHighConfidence(confidence)
           ? Recommendation(
               id: 'pypi-latency-high',
-              title: 'Python packages may download slowly',
+              title: 'PyPI feels slow',
               detail:
-                  '${slowest.hostname} took about '
-                  '${slowest.latency!.inMilliseconds} ms for an HTTP status '
-                  'response. Installs and updates can feel slower than usual.',
+                  '${slowest.hostname} took '
+                  '${slowest.latency!.inMilliseconds} ms to respond. '
+                  'Installs may run slower than usual.',
               priority: DiagnosticSeverity.medium,
             )
           : null,

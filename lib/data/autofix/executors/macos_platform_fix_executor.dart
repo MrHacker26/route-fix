@@ -44,14 +44,14 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
   Future<FixResult> _setIpv6({required bool enabled}) async {
     final kind =
         enabled ? FixActionKind.enableIpv6 : FixActionKind.disableIpv6;
-    final verb = enabled ? 'restore' : 'prefer IPv4 on';
+    final verb = enabled ? 'restore' : 'update';
     final flag = enabled ? '-setv6automatic' : '-setv6off';
 
     final services = await _resolveTargetServices(kind);
     if (services.isEmpty) {
       return FixResult.failure(
         kind,
-        message: 'Could not $verb this network.',
+        message: 'Couldn’t find a network service to $verb.',
         error: 'No enabled network services found.',
         executed: true,
         platform: platform,
@@ -78,7 +78,7 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
     } on ArgumentError catch (error) {
       return FixResult.failure(
         kind,
-        message: 'Could not $verb this network.',
+        message: 'Couldn’t $verb network settings.',
         error: error.message,
         executed: false,
         platform: platform,
@@ -87,7 +87,7 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
     } on AutoFixException catch (error) {
       return FixResult.failure(
         kind,
-        message: 'Could not $verb this network.',
+        message: 'Couldn’t $verb network settings.',
         error: error.message,
         executed: false,
         platform: platform,
@@ -137,7 +137,7 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
     if (!result.isSuccess) {
       return FixResult.failure(
         kind,
-        message: 'Could not $verb this network.',
+        message: 'Couldn’t $verb network settings.',
         error: result.stderr.isNotEmpty
             ? result.stderr
             : (result.stdout.isNotEmpty
@@ -162,8 +162,8 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
     return FixResult.success(
       kind,
       message: enabled
-          ? 'Network defaults restored (${applied.join(', ')}).'
-          : 'Prefer IPv4 applied (${applied.join(', ')}).',
+          ? 'Defaults restored.'
+          : 'Prefer IPv4 is on.',
       platform: platform,
       requiresElevation: true,
       executedCommand: result.executedCommand,

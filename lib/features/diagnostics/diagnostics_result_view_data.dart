@@ -51,10 +51,10 @@ final class DiagnosticsResultViewData {
     final scoreTone = _toneForScore(report.health.score);
 
     final summary = report.issues.isEmpty
-        ? 'Everything looks healthy.'
+        ? 'All clear.'
         : report.issues.length == 1
-            ? 'One path may feel slower than usual.'
-            : 'A few paths may feel slower than usual.';
+            ? 'One path looks slower than usual.'
+            : 'A few paths look slower than usual.';
 
     final created = report.createdAt.toLocal();
     final timestamp =
@@ -67,7 +67,7 @@ final class DiagnosticsResultViewData {
             title: _friendlyIssueTitle(issue),
             detail: HumanMessage.fromProbeError(
               issue.description,
-              fallback: 'We couldn’t fully verify this path.',
+              fallback: 'Couldn’t fully verify this path.',
             ),
             severity: HumanMessage.severityLabel(issue.severity.name),
             tone: _toneForSeverity(issue.severity),
@@ -103,7 +103,7 @@ final class DiagnosticsResultViewData {
     final lower = raw.toLowerCase();
     if (lower.contains('all diagnosis rules passed') ||
         lower.contains('rules passed')) {
-      return 'Everything looks healthy.';
+      return 'All clear.';
     }
     if (RegExp(r'^\d+\s+issues?\s+detected').hasMatch(lower)) {
       return fallback;
@@ -254,7 +254,7 @@ final class DiagnosticsResultViewData {
         final formatted = ratio >= 2
             ? ratio.round().toString()
             : ratio.toStringAsFixed(1);
-        return 'IPv6 is about $formatted× slower than IPv4 right now.';
+        return 'IPv6 is slower than IPv4 right now.';
       }
     }
 
@@ -274,13 +274,13 @@ final class DiagnosticsResultViewData {
   }) {
     return switch (action.kind) {
       FixActionKind.disableIpv6 =>
-        'Prefer IPv4 when the IPv6 path is clearly slower or unavailable.',
+        'Use IPv4 when IPv6 is clearly slower or unavailable.',
       FixActionKind.enableIpv6 =>
-        'Restore IPv6 if it was switched off earlier.',
+        'Return to normal settings if IPv6 was switched off.',
       FixActionKind.flushDns =>
-        'Clear outdated DNS answers after network changes.',
+        'Clear outdated name lookups after network changes.',
       FixActionKind.openWarp =>
-        'Try a quieter edge path when public routes feel congested.',
+        'Try WARP when public routes feel congested.',
     };
   }
 
@@ -439,17 +439,17 @@ final class DiagnosticsResultViewData {
       NetworkMetricView(
         title: 'DNS',
         value: !dnsKnown
-            ? '— Not Checked'
+            ? '— Not checked'
             : dnsOk
                 ? (dnsMs != null ? '✓ $dnsMs ms' : '✓ Resolved')
                 : '✕ Unavailable',
         detail: !dnsKnown
-            ? 'No DNS evidence in this scan.'
+            ? 'Not checked in this scan.'
             : dnsOk
                 ? 'Name lookup completed.'
                 : HumanMessage.fromProbeError(
                     meta['dns_error'],
-                    fallback: 'We couldn’t verify DNS.',
+                    fallback: 'Couldn’t verify DNS.',
                   ),
         tone: !dnsKnown
             ? StatusBadgeTone.neutral
@@ -473,19 +473,19 @@ final class DiagnosticsResultViewData {
       NetworkMetricView(
         title: 'IPv4',
         value: !ipv4Known
-            ? '— Not Checked'
+            ? '— Not checked'
             : ipv4Ok
                 ? (ipv4TcpMs != null
                     ? '✓ Connected · $ipv4TcpMs ms'
                     : '✓ Connected')
                 : '✕ Unavailable',
         detail: !ipv4Known
-            ? 'No IPv4 evidence in this scan.'
+            ? 'Not checked in this scan.'
             : ipv4Ok
-                ? 'TCP path connected.'
+                ? 'Connected.'
                 : HumanMessage.fromProbeError(
                     meta['ipv4_error'],
-                    fallback: 'We couldn’t verify IPv4.',
+                    fallback: 'Couldn’t verify IPv4.',
                   ),
         tone: !ipv4Known
             ? StatusBadgeTone.neutral
@@ -519,21 +519,21 @@ final class DiagnosticsResultViewData {
       NetworkMetricView(
         title: 'IPv6',
         value: !ipv6Known
-            ? '— Not Checked'
+            ? '— Not checked'
             : ipv6Ok
                 ? (ipv6TcpMs != null
-                    ? '✓ Native · $ipv6TcpMs ms'
-                    : '✓ Native')
-                : (noNativeIpv6 ? '— Ready' : '✕ Unavailable'),
+                    ? '✓ Online · $ipv6TcpMs ms'
+                    : '✓ Online')
+                : (noNativeIpv6 ? '— Idle' : '✕ Unavailable'),
         detail: !ipv6Known
-            ? 'No IPv6 evidence in this scan.'
+            ? 'Not checked in this scan.'
             : ipv6Ok
-                ? 'Native IPv6 path available.'
+                ? 'IPv6 is available.'
                 : (noNativeIpv6
-                    ? 'No native IPv6 advertised.'
+                    ? 'No IPv6 on this network.'
                     : HumanMessage.fromProbeError(
                         meta['ipv6_error'],
-                        fallback: 'We couldn’t verify IPv6.',
+                        fallback: 'Couldn’t verify IPv6.',
                       )),
         tone: !ipv6Known
             ? StatusBadgeTone.neutral
@@ -560,17 +560,17 @@ final class DiagnosticsResultViewData {
       NetworkMetricView(
         title: 'TLS',
         value: !tlsKnown
-            ? '— Not Checked'
+            ? '— Not checked'
             : cfOk
-                ? (tlsMs != null ? '✓ $tlsMs ms' : '✓ Successful')
+                ? (tlsMs != null ? '✓ $tlsMs ms' : '✓ OK')
                 : '✕ Unavailable',
         detail: !tlsKnown
-            ? 'No TLS evidence in this scan.'
+            ? 'Not checked in this scan.'
             : cfOk
-                ? 'Secure handshake completed.'
+                ? 'Secure connection completed.'
                 : HumanMessage.fromProbeError(
                     meta['cloudflare_error'],
-                    fallback: 'TLS could not be verified.',
+                    fallback: 'Couldn’t verify the secure link.',
                   ),
         tone: !tlsKnown
             ? StatusBadgeTone.neutral
@@ -593,7 +593,7 @@ final class DiagnosticsResultViewData {
         cfStatus != null ||
         cfHttpMs != null;
     final httpsValue = !httpsKnown
-        ? '— Not Checked'
+        ? '— Not checked'
         : !cfOk
             ? '✕ Unavailable'
             : (cfStatusCode != null &&
@@ -608,12 +608,12 @@ final class DiagnosticsResultViewData {
         title: 'HTTPS',
         value: httpsValue,
         detail: !httpsKnown
-            ? 'No HTTPS evidence in this scan.'
+            ? 'Not checked in this scan.'
             : cfOk
-                ? 'HTTPS verified successfully.'
+                ? 'HTTPS looks good.'
                 : HumanMessage.fromProbeError(
                     meta['cloudflare_error'],
-                    fallback: 'We couldn’t verify HTTPS.',
+                    fallback: 'Couldn’t verify HTTPS.',
                   ),
         tone: !httpsKnown
             ? StatusBadgeTone.neutral
@@ -748,20 +748,20 @@ final class DiagnosticsResultViewData {
       return 'IPv6 is slower than expected';
     }
     if (code.contains('ipv6_unavailable')) {
-      return 'We couldn’t verify IPv6';
+      return 'Couldn’t verify IPv6';
     }
     if (code.contains('dns')) return 'Name lookup needs a look';
     if (code.contains('github')) return 'GitHub took longer than expected';
-    if (code.contains('pypi')) return 'Python packages may download slowly';
+    if (code.contains('pypi')) return 'PyPI feels slow';
     return issue.title;
   }
 
   static String _availabilityLabel(FixAvailability availability) {
     return switch (availability) {
       FixAvailability.available => 'Ready',
-      FixAvailability.requiresElevation => 'Needs permission',
-      FixAvailability.comingSoon => 'Coming soon',
-      FixAvailability.unsupported => 'Unavailable here',
+      FixAvailability.requiresElevation => 'Needs password',
+      FixAvailability.comingSoon => 'Soon',
+      FixAvailability.unsupported => 'Unavailable',
     };
   }
 

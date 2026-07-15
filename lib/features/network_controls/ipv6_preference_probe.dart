@@ -88,19 +88,19 @@ final class Ipv6PreferenceProbe {
             ? Ipv6Preference.preferIpv4
             : Ipv6Preference.disableIpv6,
         detail: fromAutoFix
-            ? 'IPv6 is off following Prefer IPv4.'
-            : 'IPv6 is disabled on active services.',
+            ? 'Prefer IPv4 is on.'
+            : 'IPv6 is off.',
       );
     }
     if (automaticCount == modes.length) {
       return const Ipv6PreferenceProbeResult(
         preference: Ipv6Preference.automatic,
-        detail: 'IPv6 is set to Automatic.',
+        detail: 'IPv6 is automatic.',
       );
     }
     return const Ipv6PreferenceProbeResult(
       preference: Ipv6Preference.unknown,
-      detail: 'Mixed IPv6 configuration across services.',
+      detail: 'IPv6 settings differ across services.',
     );
   }
 

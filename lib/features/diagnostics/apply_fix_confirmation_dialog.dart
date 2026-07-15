@@ -56,7 +56,7 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
               Text(title, style: text.titleLarge),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'RouteFix will temporarily modify your network configuration.',
+                'This updates how your computer chooses network paths.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,
@@ -64,7 +64,7 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Administrator permission may be required.',
+                'You may be asked for your password.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,
@@ -72,7 +72,7 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'This can be restored at any time.',
+                'You can undo this anytime.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,
@@ -95,7 +95,7 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: PrimaryButton(
-                      label: 'Apply Fix',
+                      label: 'Apply',
                       icon: Icons.auto_fix_high_outlined,
                       expanded: true,
                       onPressed: () {

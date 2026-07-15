@@ -17,14 +17,14 @@ extension Ipv6PreferenceLabels on Ipv6Preference {
   /// Status chip label for the detected configuration.
   String get statusLabel => switch (this) {
         Ipv6Preference.automatic => 'Automatic',
-        Ipv6Preference.preferIpv4 => 'Preferred IPv4',
-        Ipv6Preference.disableIpv6 => 'IPv6 Disabled',
+        Ipv6Preference.preferIpv4 => 'Prefer IPv4',
+        Ipv6Preference.disableIpv6 => 'IPv6 off',
         Ipv6Preference.unknown => 'Unknown',
       };
 
   /// Radio option title.
   String get optionLabel => switch (this) {
-        Ipv6Preference.automatic => 'Automatic (Recommended)',
+        Ipv6Preference.automatic => 'Automatic',
         Ipv6Preference.preferIpv4 => 'Prefer IPv4',
         Ipv6Preference.disableIpv6 => 'Disable IPv6',
         Ipv6Preference.unknown => 'Unknown',

@@ -2,6 +2,7 @@
 library;
 
 export 'app_theme.dart';
+export 'components/feedback_state.dart';
 export 'components/glass_card.dart';
 export 'components/page_atmosphere.dart';
 export 'components/primary_button.dart';

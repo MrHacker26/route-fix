@@ -57,24 +57,24 @@ final class DashboardViewData {
       final raw = report.health.summary?.trim() ?? '';
       if (raw.toLowerCase().contains('all diagnosis rules passed') ||
           report.issues.isEmpty) {
-        return 'No routing issues detected.';
+        return 'No routing issues found.';
       }
       if (RegExp(r'^\d+\s+issues?\s+detected', caseSensitive: false)
           .hasMatch(raw)) {
-        return 'A few paths may need attention.';
+        return 'A few paths need a closer look.';
       }
       return raw.isEmpty ? 'Based on your latest scan.' : raw;
     }();
 
     final canStartWorking = report.issues.isEmpty
-        ? 'You can start working.'
+        ? 'You’re good to go.'
         : report.issues.any(
             (i) =>
                 i.severity == DiagnosticSeverity.high ||
                 i.severity == DiagnosticSeverity.critical,
           )
-            ? 'Fix recommended before relying on affected paths.'
-            : 'You can work, with one or two paths quieter than usual.';
+            ? 'Worth fixing before you rely on those paths.'
+            : 'You can work — a few paths are quieter than usual.';
 
     final recommendation = _recommendationFrom(report);
     final created = report.createdAt.toLocal();
@@ -133,14 +133,14 @@ final class DashboardViewData {
     }
     if (report.issues.isEmpty) {
       return (
-        title: 'Everything looks healthy.',
-        detail: 'No action required.',
+        title: 'All clear.',
+        detail: 'Nothing to change.',
         tone: StatusBadgeTone.success,
         action: null,
       );
     }
     return (
-      title: 'No recommendation available.',
+      title: 'No recommended fix.',
       detail: HumanMessage.fromProbeError(
         report.issues.first.description,
         fallback: report.issues.first.title,
@@ -165,17 +165,17 @@ final class DashboardViewData {
       NetworkSnapshotRow(
         title: 'DNS',
         summary: !dnsKnown
-            ? '— Not Checked'
+            ? '— Not checked'
             : dnsOk
                 ? (dnsMs != null ? '✓ $dnsMs ms' : '✓ Resolved')
                 : '✕ Unavailable',
         explanation: !dnsKnown
-            ? 'No DNS evidence in this scan.'
+            ? 'Not checked in this scan.'
             : dnsOk
                 ? 'Name lookup completed.'
                 : HumanMessage.fromProbeError(
                     meta['dns_error'],
-                    fallback: 'We couldn’t verify DNS.',
+                    fallback: 'Couldn’t verify DNS.',
                   ),
         tone: !dnsKnown
             ? StatusBadgeTone.neutral
@@ -183,7 +183,7 @@ final class DashboardViewData {
                 ? StatusBadgeTone.success
                 : StatusBadgeTone.error,
         badge: !dnsKnown
-            ? 'Not Checked'
+            ? 'Not checked'
             : dnsOk
                 ? 'Healthy'
                 : 'Unavailable',
@@ -199,17 +199,17 @@ final class DashboardViewData {
       NetworkSnapshotRow(
         title: 'IPv4',
         summary: !ipv4Known
-            ? '— Not Checked'
+            ? '— Not checked'
             : ipv4Ok
                 ? (ipv4Ms != null ? '✓ Connected · $ipv4Ms ms' : '✓ Connected')
                 : '✕ Unavailable',
         explanation: !ipv4Known
-            ? 'No IPv4 evidence in this scan.'
+            ? 'Not checked in this scan.'
             : ipv4Ok
-                ? 'TCP path connected.'
+                ? 'Connected.'
                 : HumanMessage.fromProbeError(
                     meta['ipv4_error'],
-                    fallback: 'We couldn’t verify IPv4.',
+                    fallback: 'Couldn’t verify IPv4.',
                   ),
         tone: !ipv4Known
             ? StatusBadgeTone.neutral
@@ -217,7 +217,7 @@ final class DashboardViewData {
                 ? StatusBadgeTone.success
                 : StatusBadgeTone.error,
         badge: !ipv4Known
-            ? 'Not Checked'
+            ? 'Not checked'
             : ipv4Ok
                 ? 'Connected'
                 : 'Unavailable',
@@ -240,19 +240,19 @@ final class DashboardViewData {
       NetworkSnapshotRow(
         title: 'IPv6',
         summary: !ipv6Known
-            ? '— Not Checked'
+            ? '— Not checked'
             : ipv6Ok
-                ? (ipv6Ms != null ? '✓ Native · $ipv6Ms ms' : '✓ Native')
-                : (noNative ? '— Ready' : '✕ Unavailable'),
+                ? (ipv6Ms != null ? '✓ Online · $ipv6Ms ms' : '✓ Online')
+                : (noNative ? '— Idle' : '✕ Unavailable'),
         explanation: !ipv6Known
-            ? 'No IPv6 evidence in this scan.'
+            ? 'Not checked in this scan.'
             : ipv6Ok
-                ? 'Native IPv6 path available.'
+                ? 'IPv6 is available.'
                 : (noNative
-                    ? 'No native IPv6 advertised.'
+                    ? 'No IPv6 on this network.'
                     : HumanMessage.fromProbeError(
                         meta['ipv6_error'],
-                        fallback: 'We couldn’t verify IPv6.',
+                        fallback: 'Couldn’t verify IPv6.',
                       )),
         tone: !ipv6Known
             ? StatusBadgeTone.neutral
@@ -260,10 +260,10 @@ final class DashboardViewData {
                 ? StatusBadgeTone.success
                 : (noNative ? StatusBadgeTone.neutral : StatusBadgeTone.warning),
         badge: !ipv6Known
-            ? 'Not Checked'
+            ? 'Not checked'
             : ipv6Ok
                 ? 'Online'
-                : (noNative ? 'Ready' : 'Unavailable'),
+                : (noNative ? 'Idle' : 'Unavailable'),
         icon: Icons.filter_6_rounded,
       ),
     );
@@ -276,17 +276,17 @@ final class DashboardViewData {
       NetworkSnapshotRow(
         title: 'TLS',
         summary: !tlsKnown
-            ? '— Not Checked'
+            ? '— Not checked'
             : cfOk
-                ? (tlsMs != null ? '✓ $tlsMs ms' : '✓ Successful')
+                ? (tlsMs != null ? '✓ $tlsMs ms' : '✓ OK')
                 : '✕ Unavailable',
         explanation: !tlsKnown
-            ? 'No TLS evidence in this scan.'
+            ? 'Not checked in this scan.'
             : cfOk
-                ? 'Secure handshake completed.'
+                ? 'Secure connection completed.'
                 : HumanMessage.fromProbeError(
                     meta['cloudflare_error'],
-                    fallback: 'TLS could not be verified.',
+                    fallback: 'Couldn’t verify the secure link.',
                   ),
         tone: !tlsKnown
             ? StatusBadgeTone.neutral
@@ -294,7 +294,7 @@ final class DashboardViewData {
                 ? StatusBadgeTone.success
                 : StatusBadgeTone.error,
         badge: !tlsKnown
-            ? 'Not Checked'
+            ? 'Not checked'
             : cfOk
                 ? 'Healthy'
                 : 'Unavailable',
@@ -310,7 +310,7 @@ final class DashboardViewData {
         cfStatus != null ||
         cfHttpMs != null;
     final httpsSummary = !httpsKnown
-        ? '— Not Checked'
+        ? '— Not checked'
         : !cfOk
             ? '✕ Unavailable'
             : (cfStatusCode != null &&
@@ -325,12 +325,12 @@ final class DashboardViewData {
         title: 'HTTPS',
         summary: httpsSummary,
         explanation: !httpsKnown
-            ? 'No HTTPS evidence in this scan.'
+            ? 'Not checked in this scan.'
             : cfOk
-                ? 'HTTPS verified successfully.'
+                ? 'HTTPS looks good.'
                 : HumanMessage.fromProbeError(
                     meta['cloudflare_error'],
-                    fallback: 'We couldn’t verify HTTPS.',
+                    fallback: 'Couldn’t verify HTTPS.',
                   ),
         tone: !httpsKnown
             ? StatusBadgeTone.neutral
@@ -338,7 +338,7 @@ final class DashboardViewData {
                 ? StatusBadgeTone.success
                 : StatusBadgeTone.error,
         badge: !httpsKnown
-            ? 'Not Checked'
+            ? 'Not checked'
             : cfOk
                 ? 'Healthy'
                 : 'Unavailable',
@@ -592,9 +592,9 @@ class DeveloperServiceRow {
 
   String get badgeLabel => switch (status) {
         ServiceStatus.healthy => 'Healthy',
-        ServiceStatus.slow => 'Warning',
+        ServiceStatus.slow => 'Slow',
         ServiceStatus.unavailable => 'Unavailable',
-        ServiceStatus.notChecked => 'Not Checked',
+        ServiceStatus.notChecked => 'Not checked',
       };
 
   StatusBadgeTone get tone => switch (status) {

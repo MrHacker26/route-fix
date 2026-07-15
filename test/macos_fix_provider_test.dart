@@ -43,10 +43,10 @@ void main() {
       expect(result.metadata['applied'], 'Wi-Fi, Thunderbolt Bridge');
       expect(commands.first, ['networksetup', '-listallnetworkservices']);
       final osascripts = commands.where((c) => c.first == 'osascript').toList();
-      expect(osascripts, hasLength(2));
-      expect(osascripts[0][2], contains('-setv6off'));
-      expect(osascripts[0][2], contains('Wi-Fi'));
-      expect(osascripts[1][2], contains('Thunderbolt Bridge'));
+      expect(osascripts, hasLength(1));
+      expect(osascripts.single[2], contains('-setv6off'));
+      expect(osascripts.single[2], contains('Wi-Fi'));
+      expect(osascripts.single[2], contains('Thunderbolt Bridge'));
     });
 
     test('prefers the active service when detectable', () async {
@@ -166,7 +166,7 @@ void main() {
       final result = await provider.apply(FixActionKind.disableIpv6);
 
       expect(result.success, isFalse);
-      expect(result.message, contains('Could not prefer IPv4'));
+      expect(result.message, contains('Couldn’t find a network service'));
       expect(result.error, contains('No enabled network services'));
     });
 

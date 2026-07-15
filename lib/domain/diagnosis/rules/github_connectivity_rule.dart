@@ -47,8 +47,8 @@ final class GitHubConnectivityRule
               title: 'GitHub is hard to reach',
               detail: input.error ??
                   (status != null
-                      ? 'GitHub answered with an unexpected status ($status).'
-                      : 'We couldn’t complete a check against GitHub just now.'),
+                      ? 'GitHub replied with status $status.'
+                      : 'Couldn’t finish the GitHub check.'),
               priority: DiagnosticSeverity.high,
             )
           : null,

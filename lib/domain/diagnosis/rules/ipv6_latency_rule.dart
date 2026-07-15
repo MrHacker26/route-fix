@@ -53,17 +53,14 @@ final class Ipv6LatencyRule implements DiagnosisRule<DualStackObservation> {
         recommendation: Recommendation(
           id: 'prefer-ipv4-ipv6-failed',
           title: 'Prefer IPv4',
-          detail: ipv6.error == null || ipv6.error!.trim().isEmpty
-              ? 'IPv4 works, but the IPv6 path failed with a concrete '
-                  'routing error. Preferring IPv4 usually makes tools more '
-                  'reliable.'
-              : 'IPv4 works, but IPv6 failed: ${ipv6.error}. Preferring IPv4 '
-                  'usually makes tools more reliable.',
+          detail: 'IPv4 is fine. IPv6 isn’t. Prefer IPv4 for now.',
           priority: DiagnosticSeverity.medium,
-          actionLabel: 'Disable IPv6',
+          actionLabel: 'Prefer IPv4',
           metadata: {
             'fix_kind': 'disable_ipv6',
             'evidence': 'ipv6_failed_ipv4_ok_dns_ok',
+            if (ipv6.error != null && ipv6.error!.trim().isNotEmpty)
+              'ipv6_error': ipv6.error!,
           },
         ),
       );
@@ -78,12 +75,11 @@ final class Ipv6LatencyRule implements DiagnosisRule<DualStackObservation> {
       recommendation: Recommendation(
         id: 'ipv6-latency-high',
         title: 'Prefer IPv4',
-        detail:
-            'IPv6 TCP connect took about ${ipv6Ms} ms versus ${ipv4Ms} ms '
-            'on IPv4 (${ratio.toStringAsFixed(1)}× slower). Preferring IPv4 '
-            'usually makes everyday developer tools feel snappier.',
+        detail: ratio >= 2
+            ? 'IPv6 is about ${ratio.round()}× slower than IPv4. Prefer IPv4 for now.'
+            : 'IPv6 is slower than IPv4 right now. Prefer IPv4 for now.',
         priority: DiagnosticSeverity.medium,
-        actionLabel: 'Disable IPv6',
+        actionLabel: 'Prefer IPv4',
         metadata: {
           'fix_kind': 'disable_ipv6',
           'evidence': 'ipv6_significantly_slower',

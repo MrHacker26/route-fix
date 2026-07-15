@@ -22,21 +22,21 @@ abstract final class OnboardingSteps {
       eyebrow: 'Welcome',
       title: 'RouteFix',
       body:
-          'See why GitHub, PyPI, Docker, and APIs feel slow — even when your bandwidth looks fine.',
+          'Find out why tools feel slow when your connection looks fine.',
       icon: Icons.hub_outlined,
     ),
     OnboardingStepData(
       eyebrow: 'Clarity',
       title: 'Not a speed test',
       body:
-          'We measure how traffic reaches services, not how many megabits your ISP advertises.',
+          'RouteFix checks how you reach services — not download speed.',
       icon: Icons.speed_outlined,
     ),
     OnboardingStepData(
-      eyebrow: 'Diagnosis',
-      title: 'Find the real bottleneck',
+      eyebrow: 'Precision',
+      title: 'Measure what matters',
       body:
-          'Trace DNS, routes, and connection timing to the hosts you care about — so fixes stay precise.',
+          'Name lookup, routes, and timing to the hosts you use every day.',
       icon: Icons.timeline_outlined,
     ),
   ];

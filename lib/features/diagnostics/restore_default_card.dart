@@ -8,7 +8,7 @@ import '../../domain/autofix/models/fix_type.dart';
 import '../../domain/autofix/platform_fix_executor.dart';
 import 'human_message.dart';
 
-/// Offers Restore Default when RouteFix has applied a temporary network change.
+/// Offers Restore when RouteFix has applied a temporary network change.
 class RestoreDefaultCard extends StatefulWidget {
   const RestoreDefaultCard({
     super.key,
@@ -65,7 +65,7 @@ class _RestoreDefaultCardState extends State<RestoreDefaultCard> {
         _failureTechnical = error.toString();
         _failureMessage = HumanMessage.fromProbeError(
           error.toString(),
-          fallback: 'We couldn’t restore defaults just now.',
+          fallback: 'Couldn’t restore defaults.',
         );
       });
       return;
@@ -100,7 +100,7 @@ class _RestoreDefaultCardState extends State<RestoreDefaultCard> {
       ].where((part) => part.trim().isNotEmpty).join('\n');
       _failureMessage = HumanMessage.fromProbeError(
         result.message ?? result.error,
-        fallback: 'Restore didn’t complete. You can try again.',
+        fallback: 'Restore didn’t finish. Try again.',
       );
     });
   }
@@ -128,7 +128,7 @@ class _RestoreDefaultCardState extends State<RestoreDefaultCard> {
           Text(title, style: text.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Undo Auto Fix changes and restore default network settings.',
+            'Undo temporary changes and return to normal settings.',
             style: text.bodyMedium?.copyWith(
               color: AppColors.onSurfaceVariant,
               height: 1.45,
@@ -136,27 +136,7 @@ class _RestoreDefaultCardState extends State<RestoreDefaultCard> {
           ),
           if (_loading) ...[
             const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                const SizedBox(
-                  width: AppSpacing.iconRow,
-                  height: AppSpacing.iconRow,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    _progressLabel,
-                    style: text.bodyMedium?.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            InlineProgress(label: _progressLabel),
           ],
           if (_failureMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
@@ -178,7 +158,7 @@ class _RestoreDefaultCardState extends State<RestoreDefaultCard> {
                   child: ExpansionTile(
                     tilePadding: EdgeInsets.zero,
                     title: Text(
-                      'View technical details',
+                      'Technical details',
                       style:
                           text.labelMedium?.copyWith(color: AppColors.primary),
                     ),
@@ -204,7 +184,7 @@ class _RestoreDefaultCardState extends State<RestoreDefaultCard> {
           SizedBox(
             width: double.infinity,
             child: SecondaryButton(
-              label: _loading ? _progressLabel : 'Restore Default',
+              label: _loading ? _progressLabel : 'Restore',
               icon: _loading ? null : Icons.undo_rounded,
               expanded: true,
               onPressed: _loading ? null : _handleRestore,
@@ -236,10 +216,10 @@ class _RestoreConfirmationDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Restore Default?', style: text.titleLarge),
+              Text('Restore defaults?', style: text.titleLarge),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'RouteFix will undo temporary network changes and restore defaults.',
+                'This undoes temporary network changes.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,
@@ -247,7 +227,7 @@ class _RestoreConfirmationDialog extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Administrator permission may be required.',
+                'You may be asked for your password.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,
@@ -266,7 +246,7 @@ class _RestoreConfirmationDialog extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: PrimaryButton(
-                      label: 'Restore Default',
+                      label: 'Restore',
                       icon: Icons.undo_rounded,
                       expanded: true,
                       onPressed: () => Navigator.of(context).pop(true),

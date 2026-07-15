@@ -127,7 +127,7 @@ void main() {
     expect(report.issues.map((i) => i.id), contains('ipv6_latency'));
     expect(report.recommendations, isNotEmpty);
     expect(
-      report.recommendations.any((r) => r.actionLabel == 'Disable IPv6'),
+      report.recommendations.any((r) => r.actionLabel == 'Prefer IPv4'),
       isTrue,
     );
   });
@@ -176,7 +176,7 @@ void main() {
 
     expect(report.issues.map((i) => i.id), isNot(contains('ipv6_latency')));
     expect(
-      report.recommendations.any((r) => r.actionLabel == 'Disable IPv6'),
+      report.recommendations.any((r) => r.actionLabel == 'Prefer IPv4'),
       isFalse,
     );
   });

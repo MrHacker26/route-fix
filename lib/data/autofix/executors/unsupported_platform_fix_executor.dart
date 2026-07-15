@@ -18,7 +18,7 @@ final class UnsupportedPlatformFixExecutor implements PlatformFixExecutor {
     final kind = type.toFixActionKind ?? FixActionKind.disableIpv6;
     return FixResult.failure(
       kind,
-      message: 'Auto Fix is not available on this platform.',
+      message: 'Auto Fix isn’t available here.',
       error: 'Unsupported platform.',
       executed: false,
       platform: platform,

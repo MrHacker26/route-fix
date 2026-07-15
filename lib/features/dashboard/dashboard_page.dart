@@ -9,6 +9,7 @@ import '../../di/app_services.dart';
 import '../diagnostics/diagnostics_page.dart';
 import '../diagnostics/diagnostics_result_page.dart';
 import '../network_controls/network_controls_page.dart';
+import '../settings/settings_page.dart';
 import 'dashboard_view_data.dart';
 
 /// Desktop command center — powered by [DiagnosticsCoordinator].
@@ -89,9 +90,9 @@ class _DashboardPageState extends State<DashboardPage>
       return 'Couldn’t reach the network. Check your connection and try again.';
     }
     if (message.contains('TimeoutException') || message.contains('timed out')) {
-      return 'This diagnostic run took too long. Please try again.';
+      return 'This scan took too long. Try again.';
     }
-    return 'Something went wrong while running diagnostics. Please try again.';
+    return 'Something went wrong. Try again.';
   }
 
   void _openScan() {
@@ -152,6 +153,24 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
+  void _openSettings() {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (context, animation, secondary) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: SettingsPage(controller: AppServices.settings),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -185,6 +204,7 @@ class _DashboardPageState extends State<DashboardPage>
                         onRunScan: _loading ? null : _openScan,
                         onRefresh: _loading ? null : _load,
                         onNetworkControls: _openNetworkControls,
+                        onSettings: _openSettings,
                       ),
                       Expanded(
                         child: CustomScrollView(
@@ -324,6 +344,10 @@ class _DashboardPageState extends State<DashboardPage>
                                       interval: const Interval(0.32, 0.75),
                                       child: _TechnicalDetailsCard(
                                         groups: data.technicalGroups,
+                                        initiallyExpanded: AppServices
+                                            .settings
+                                            .settings
+                                            .showTechnicalDetailsByDefault,
                                       ),
                                     ),
                                   ],
@@ -379,6 +403,7 @@ class _DesktopToolbar extends StatelessWidget {
     required this.onRunScan,
     required this.onRefresh,
     required this.onNetworkControls,
+    required this.onSettings,
     this.healthLabel,
     this.healthTone,
     this.scannedAt,
@@ -392,6 +417,7 @@ class _DesktopToolbar extends StatelessWidget {
   final VoidCallback? onRunScan;
   final VoidCallback? onRefresh;
   final VoidCallback onNetworkControls;
+  final VoidCallback onSettings;
 
   @override
   Widget build(BuildContext context) {
@@ -433,9 +459,9 @@ class _DesktopToolbar extends StatelessWidget {
               const SizedBox(width: AppSpacing.sm),
               StatusBadge(
                 label: loading
-                    ? 'Investigating'
+                    ? 'Scanning'
                     : error
-                        ? 'Needs Attention'
+                        ? 'Attention'
                         : (healthLabel ?? 'Ready'),
                 tone: loading
                     ? StatusBadgeTone.info
@@ -473,6 +499,24 @@ class _DesktopToolbar extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.xxs),
               IconButton(
+                tooltip: 'Settings',
+                onPressed: onSettings,
+                icon: const Icon(
+                  Icons.settings_outlined,
+                  size: AppSpacing.iconInline,
+                ),
+                style: IconButton.styleFrom(
+                  foregroundColor: AppColors.onSurfaceVariant,
+                  hoverColor: AppColors.surfaceHigh,
+                  minimumSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadius.xsAll,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xxs),
+              IconButton(
                 tooltip: 'Refresh',
                 onPressed: onRefresh,
                 icon: const Icon(
@@ -491,7 +535,7 @@ class _DesktopToolbar extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.xs),
               SecondaryButton(
-                label: loading ? 'Scanning…' : 'Run Scan',
+                label: loading ? 'Scanning…' : 'Scan',
                 icon: loading ? null : Icons.radar_rounded,
                 onPressed: onRunScan,
               ),
@@ -510,58 +554,11 @@ class _CommandCenterLoading extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget card(String title, String message) {
-      return GlassCard(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(title, style: AppTypography.textTheme.titleSmall),
-            const SizedBox(height: AppSpacing.md),
-            Row(
-              children: [
-                const SizedBox(
-                  width: AppSpacing.iconRow,
-                  height: AppSpacing.iconRow,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    message,
-                    style: AppTypography.textTheme.bodyMedium?.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (!wide) {
-      return Column(
-        children: [
-          card('Health Summary', 'Checking network health…'),
-          const SizedBox(height: AppSpacing.sm),
-          card('Network Snapshot', 'Measuring paths…'),
-        ],
-      );
-    }
-
-    return IntrinsicHeight(
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Expanded(flex: 4, child: card('Health Summary', 'Checking network health…')),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(flex: 6, child: card('Network Snapshot', 'Measuring paths…')),
-        ],
-      ),
+    return FeedbackState.loading(
+      title: 'Scanning your network',
+      body: wide
+          ? 'Checking health, paths, and developer services.'
+          : 'Checking health and paths.',
     );
   }
 }
@@ -577,34 +574,10 @@ class _ErrorBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final text = AppTypography.textTheme;
-    return GlassCard(
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text('Unable to load health report', style: text.titleMedium),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  message,
-                  style: text.bodyMedium?.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                    height: 1.45,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          SecondaryButton(
-            label: 'Try again',
-            icon: Icons.refresh_rounded,
-            onPressed: onRetry,
-          ),
-        ],
-      ),
+    return FeedbackState.error(
+      title: 'Couldn’t load health report',
+      body: message,
+      onAction: onRetry,
     );
   }
 }
@@ -633,7 +606,7 @@ class _HealthSummaryCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Health Summary',
+                'Health',
                 style: text.labelMedium?.copyWith(
                   color: AppColors.onSurfaceMuted,
                   letterSpacing: 0.2,
@@ -682,10 +655,10 @@ class _HealthSummaryCard extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _HealthMetaRow(label: 'Health Score', value: '$score'),
+                    _HealthMetaRow(label: 'Score', value: '$score'),
                     const SizedBox(height: AppSpacing.xxs),
                     _HealthMetaRow(
-                      label: 'Overall Status',
+                      label: 'Status',
                       value: data.healthLabel,
                     ),
                     const SizedBox(height: AppSpacing.xxs),
@@ -695,7 +668,7 @@ class _HealthSummaryCard extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpacing.xxs),
                     _HealthMetaRow(
-                      label: 'Last Scan',
+                      label: 'Last scan',
                       value: data.scannedAtLabel,
                     ),
                     const SizedBox(height: AppSpacing.sm),
@@ -832,7 +805,7 @@ class _NetworkSnapshotCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                'Network Snapshot',
+                'Network',
                 style: text.labelMedium?.copyWith(
                   color: AppColors.onSurfaceMuted,
                   letterSpacing: 0.2,
@@ -981,10 +954,10 @@ class _RecommendationCard extends StatelessWidget {
     final text = AppTypography.textTheme;
     final badgeLabel = switch (tone) {
       StatusBadgeTone.success => 'Healthy',
-      StatusBadgeTone.neutral => 'Ready',
-      StatusBadgeTone.info => 'Ready',
-      StatusBadgeTone.warning => 'Needs Attention',
-      StatusBadgeTone.error => 'Needs Attention',
+      StatusBadgeTone.neutral => 'OK',
+      StatusBadgeTone.info => 'OK',
+      StatusBadgeTone.warning => 'Attention',
+      StatusBadgeTone.error => 'Attention',
     };
 
     return GlassCard(
@@ -1043,7 +1016,7 @@ class _RecommendationCard extends StatelessWidget {
                 const SizedBox(width: AppSpacing.xs),
                 Expanded(
                   child: Text(
-                    'Recommended action · $action',
+                    'Next · $action',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: text.labelSmall?.copyWith(
@@ -1075,7 +1048,7 @@ class _RecentScanCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Recent Scan',
+            'Recent scan',
             style: text.labelMedium?.copyWith(
               color: AppColors.onSurfaceMuted,
               letterSpacing: 0.2,
@@ -1146,7 +1119,7 @@ class _DeveloperServicesCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Developer Services',
+            'Developer services',
             style: text.labelMedium?.copyWith(
               color: AppColors.onSurfaceMuted,
               letterSpacing: 0.2,
@@ -1201,7 +1174,7 @@ class _ServiceTileState extends State<_ServiceTile> {
     final subtitle = service.detail ??
         (service.lastChecked != null
             ? 'Checked · ${service.lastChecked}'
-            : 'Not checked in this scan');
+            : 'Not checked');
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -1270,9 +1243,13 @@ class _ServiceTileState extends State<_ServiceTile> {
 }
 
 class _TechnicalDetailsCard extends StatefulWidget {
-  const _TechnicalDetailsCard({required this.groups});
+  const _TechnicalDetailsCard({
+    required this.groups,
+    this.initiallyExpanded = false,
+  });
 
   final List<TechnicalGroupView> groups;
+  final bool initiallyExpanded;
 
   @override
   State<_TechnicalDetailsCard> createState() => _TechnicalDetailsCardState();
@@ -1280,7 +1257,7 @@ class _TechnicalDetailsCard extends StatefulWidget {
 
 class _TechnicalDetailsCardState extends State<_TechnicalDetailsCard>
     with SingleTickerProviderStateMixin {
-  var _expanded = false;
+  late var _expanded = widget.initiallyExpanded;
   late final AnimationController _chevron;
 
   @override
@@ -1289,6 +1266,7 @@ class _TechnicalDetailsCardState extends State<_TechnicalDetailsCard>
     _chevron = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 180),
+      value: _expanded ? 1 : 0,
     );
   }
 
@@ -1335,7 +1313,7 @@ class _TechnicalDetailsCardState extends State<_TechnicalDetailsCard>
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Technical Details',
+                          'Technical details',
                           style: text.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
                           ),

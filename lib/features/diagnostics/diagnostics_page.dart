@@ -228,8 +228,8 @@ class _DiagnosticsPageState extends State<DiagnosticsPage>
                         children: [
                           Text(
                             _finished
-                                ? 'Scan complete · open full results'
-                                : 'Following each network step…',
+                                ? 'Scan complete'
+                                : 'Checking each step…',
                             style: text.bodySmall,
                             textAlign: TextAlign.center,
                           ),
@@ -324,7 +324,7 @@ class _Header extends StatelessWidget {
                     children: [
                       Text('Diagnostics', style: text.headlineSmall),
                       Text(
-                        'Checking each network path',
+                        'Checking each path',
                         style: text.bodySmall,
                       ),
                     ],
@@ -366,7 +366,7 @@ class _Header extends StatelessWidget {
                         },
                       ),
                       Text(
-                        finished ? 'All targets checked' : 'In progress',
+                        finished ? 'All steps checked' : 'In progress',
                         style: text.labelSmall,
                       ),
                     ],
@@ -374,7 +374,7 @@ class _Header extends StatelessWidget {
                 ),
                 if (onReplay != null)
                   SecondaryButton(
-                    label: 'Run again',
+                    label: 'Scan again',
                     icon: Icons.refresh_rounded,
                     onPressed: onReplay,
                   ),
@@ -482,7 +482,7 @@ class _DiagnosticTile extends StatelessWidget {
                       child: StatusBadge(
                         label: switch (data.outcome) {
                           DiagnosticOutcome.success => 'Healthy',
-                          DiagnosticOutcome.warning => 'Needs Attention',
+                          DiagnosticOutcome.warning => 'Attention',
                           DiagnosticOutcome.info => 'Checked',
                         },
                         tone: switch (data.outcome) {

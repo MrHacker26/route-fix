@@ -61,7 +61,7 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.executed, isTrue);
-      expect(result.message, contains('administrator permission'));
+      expect(result.message, contains('Admin access'));
       expect(result.error, contains('permission denied'));
     });
 
@@ -76,7 +76,7 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.executed, isFalse);
-      expect(result.message, contains('Could not update network settings'));
+      expect(result.message, contains('Couldn’t update network settings'));
       expect(result.error, isNotNull);
     });
   });

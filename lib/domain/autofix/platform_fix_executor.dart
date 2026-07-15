@@ -13,11 +13,11 @@ enum AutoFixPhase {
 
 extension AutoFixPhaseLabel on AutoFixPhase {
   String get label => switch (this) {
-        AutoFixPhase.applying => 'Applying fix…',
+        AutoFixPhase.applying => 'Applying…',
         AutoFixPhase.updatingNetwork => 'Updating network…',
-        AutoFixPhase.restartingInterface => 'Restarting interface…',
-        AutoFixPhase.verifying => 'Verifying…',
-        AutoFixPhase.restoring => 'Restoring defaults…',
+        AutoFixPhase.restartingInterface => 'Restarting…',
+        AutoFixPhase.verifying => 'Checking…',
+        AutoFixPhase.restoring => 'Restoring…',
       };
 }
 

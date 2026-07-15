@@ -62,7 +62,7 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
     } on AutoFixException catch (error) {
       return FixResult.failure(
         kind,
-        message: 'Could not update network settings.',
+        message: 'Couldn’t update network settings.',
         error: error.message,
         executed: false,
         platform: platform,
@@ -86,8 +86,8 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
       return FixResult.failure(
         kind,
         message: permission
-            ? 'RouteFix needs administrator permission to continue.'
-            : 'Could not update network settings.',
+            ? 'Admin access is required.'
+            : 'Couldn’t update network settings.',
         error: detail,
         platform: platform,
         requiresElevation: true,
@@ -104,8 +104,8 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
     return FixResult.success(
       kind,
       message: enabled
-          ? 'Network defaults restored on active adapters.'
-          : 'Prefer IPv4 applied on active adapters.',
+          ? 'Defaults restored.'
+          : 'Prefer IPv4 is on.',
       platform: platform,
       requiresElevation: true,
       executedCommand: resultCommand(args),

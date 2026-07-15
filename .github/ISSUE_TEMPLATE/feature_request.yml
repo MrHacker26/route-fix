@@ -1,0 +1,35 @@
+name: Feature request
+description: Suggest an improvement for RouteFix.
+title: "[Feature]: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Keep it focused. RouteFix diagnoses routing — it is not a speed test.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What gap or friction are you hitting today?
+      placeholder: I can’t tell whether DNS or IPv6 is the slow hop when…
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What would you like RouteFix to do?
+      placeholder: Add a clearer comparison between IPv4 and IPv6 timings…
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you’ve tried or thought about (optional).
+    validations:
+      required: false

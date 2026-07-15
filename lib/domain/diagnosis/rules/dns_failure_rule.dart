@@ -32,10 +32,10 @@ final class DnsFailureRule
             recommendation: DiagnosisEvidence.isHighConfidence(confidence)
                 ? Recommendation(
                     id: 'dns-empty',
-                    title: 'Name lookup returned nothing',
+                    title: 'Name lookup came up empty',
                     detail:
-                        'We couldn’t find addresses for "${value.hostname}". '
-                        'Apps that need that name may stall or fail.',
+                        'No addresses found for "${value.hostname}". '
+                        'Apps that need that name may stall.',
                     priority: DiagnosticSeverity.high,
                   )
                 : null,
@@ -60,7 +60,7 @@ final class DnsFailureRule
           recommendation: typed && DiagnosisEvidence.isHighConfidence(confidence)
               ? Recommendation(
                   id: 'dns-failed',
-                  title: 'Name lookup didn’t finish',
+                  title: 'Name lookup failed',
                   detail: failure.message,
                   priority: DiagnosticSeverity.high,
                 )

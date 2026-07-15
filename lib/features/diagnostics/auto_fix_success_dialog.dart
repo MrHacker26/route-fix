@@ -49,12 +49,12 @@ class AutoFixSuccessDialog extends StatelessWidget {
                     size: AppSpacing.iconLead,
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  Text('Network Updated', style: text.titleLarge),
+                  Text('Done', style: text.titleLarge),
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'The recommended fix was successfully applied.',
+                'Your network settings were updated.',
                 style: text.bodyMedium?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.45,
@@ -65,7 +65,7 @@ class AutoFixSuccessDialog extends StatelessWidget {
                 children: [
                   Expanded(
                     child: SecondaryButton(
-                      label: 'Done',
+                      label: 'Close',
                       expanded: true,
                       onPressed: () {
                         Navigator.of(context).pop(
@@ -77,7 +77,7 @@ class AutoFixSuccessDialog extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: PrimaryButton(
-                      label: 'Run Again',
+                      label: 'Scan',
                       icon: Icons.refresh_rounded,
                       expanded: true,
                       onPressed: () {

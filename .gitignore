@@ -3,6 +3,8 @@
 *.log
 *.pyc
 *.swp
+*~
+*.orig
 .DS_Store
 .atom/
 .build/
@@ -11,6 +13,11 @@
 .svn/
 .swiftpm/
 migrate_working_dir/
+
+# OS junk
+Thumbs.db
+ehthumbs.db
+Desktop.ini
 
 # IntelliJ related
 *.iml
@@ -27,8 +34,11 @@ migrate_working_dir/
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
+.flutter-plugins
 .flutter-plugins-dependencies
+.packages
 .pub-cache/
+.pub-preload-cache/
 .pub/
 /build/
 /coverage/
@@ -43,3 +53,15 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Widget Preview related
+.widget_preview/
+
+# FVM — keep .fvmrc / config shared; ignore the local SDK checkout
+.fvm/flutter_sdk
+.fvm/versions
+
+# Environment / secrets (never commit)
+.env
+.env.*
+!.env.example

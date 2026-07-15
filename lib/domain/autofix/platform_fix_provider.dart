@@ -15,8 +15,7 @@ abstract base class PlatformFixProvider implements FixProvider {
       kind: FixActionKind.disableIpv6,
       title: 'Prefer IPv4',
       description:
-          'RouteFix detected an IPv6 routing issue. '
-          'Temporarily preferring IPv4 may improve connectivity on this network.',
+          'IPv6 looks unreliable on this network. Prefer IPv4 for now.',
       availability: FixAvailability.available,
       supportedPlatforms: {
         FixPlatform.linux,
@@ -27,9 +26,8 @@ abstract base class PlatformFixProvider implements FixProvider {
     ),
     FixAction(
       kind: FixActionKind.enableIpv6,
-      title: 'Restore Default Network Configuration',
-      description:
-          'Undo Auto Fix changes and restore default network settings.',
+      title: 'Restore defaults',
+      description: 'Undo temporary changes and return to normal settings.',
       availability: FixAvailability.available,
       supportedPlatforms: {
         FixPlatform.linux,
@@ -40,9 +38,8 @@ abstract base class PlatformFixProvider implements FixProvider {
     ),
     FixAction(
       kind: FixActionKind.flushDns,
-      title: 'Refresh DNS',
-      description:
-          'Clear saved name lookups after your network or resolver changes.',
+      title: 'Flush DNS',
+      description: 'Clear cached name lookups after network changes.',
       availability: FixAvailability.comingSoon,
       supportedPlatforms: {
         FixPlatform.linux,
@@ -54,8 +51,7 @@ abstract base class PlatformFixProvider implements FixProvider {
     FixAction(
       kind: FixActionKind.openWarp,
       title: 'Open WARP',
-      description:
-          'Try Cloudflare WARP when public routes feel congested.',
+      description: 'Try Cloudflare WARP when public routes feel congested.',
       availability: FixAvailability.comingSoon,
       supportedPlatforms: {
         FixPlatform.linux,

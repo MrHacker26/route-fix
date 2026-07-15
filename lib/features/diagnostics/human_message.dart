@@ -8,31 +8,37 @@ abstract final class HumanMessage {
     if (lower.contains('no ipv6 address advertised') ||
         lower.contains('no ipv6 route advertised') ||
         lower.contains('no native ipv6')) {
-      return 'No native IPv6 advertised.';
+      return 'No IPv6 on this network.';
     }
-    if (lower.contains('permission denied') || lower.contains('not permitted')) {
-      return 'RouteFix needs administrator permission to continue.';
+    if (lower.contains('username or password was incorrect') ||
+        lower.contains('-60005')) {
+      return 'Password wasn’t accepted. Try again when prompted.';
+    }
+    if (lower.contains('permission denied') ||
+        lower.contains('not permitted') ||
+        lower.contains('administrator')) {
+      return 'Admin access is required.';
     }
     if (lower.contains('timed out') || lower.contains('timeout')) {
-      return 'This check took too long and timed out.';
+      return 'This check timed out.';
     }
     if (lower.contains('failed host lookup') ||
         lower.contains('nodename nor servname') ||
         lower.contains('name or service not known')) {
-      return 'We couldn’t look up that hostname.';
+      return 'Couldn’t resolve that name.';
     }
     if (lower.contains('network is unreachable') ||
         lower.contains('no route to host')) {
-      return 'We couldn’t reach that network path.';
+      return 'Couldn’t reach that path.';
     }
     if (lower.contains('connection refused')) {
-      return 'The service didn’t accept the connection.';
+      return 'The service refused the connection.';
     }
     if (lower.contains('socketexception') || lower.contains('http exception')) {
-      return 'We couldn’t complete that connection attempt.';
+      return 'Couldn’t complete the connection.';
     }
     if (lower.contains('unexpected http status')) {
-      return 'The server answered, but not as expected.';
+      return 'The server replied unexpectedly.';
     }
     if (message.length > 140 ||
         lower.contains('exception') ||
@@ -45,9 +51,9 @@ abstract final class HumanMessage {
 
   static String severityLabel(String raw) {
     return switch (raw.toLowerCase()) {
-      'critical' => 'Needs Attention',
-      'high' => 'Needs Attention',
-      'medium' => 'Needs Attention',
+      'critical' => 'Attention',
+      'high' => 'Attention',
+      'medium' => 'Attention',
       'low' => 'Ready',
       'info' => 'Ready',
       _ => raw,
@@ -57,9 +63,9 @@ abstract final class HumanMessage {
   /// Labels how much a recommended fix might help a service.
   static String fixImpactLabel(String level) {
     return switch (level.toLowerCase()) {
-      'high' => 'Likely improving',
-      'medium' => 'May improve',
-      'low' => 'Slight chance',
+      'high' => 'Likely helps',
+      'medium' => 'May help',
+      'low' => 'Slight',
       'none' => 'Unaffected',
       _ => level,
     };
@@ -68,7 +74,7 @@ abstract final class HumanMessage {
   /// Labels how strongly a problem may be felt today (not fix optimism).
   static String feltImpactLabel(String level) {
     return switch (level.toLowerCase()) {
-      'high' => 'Often affected',
+      'high' => 'Often',
       'medium' => 'Sometimes',
       'low' => 'Rarely',
       'none' => 'Unaffected',
@@ -96,7 +102,7 @@ abstract final class HumanMessage {
 
   static String scoreBadge(int score) {
     if (score >= 75) return 'Healthy';
-    if (score >= 55) return 'Needs Attention';
-    return 'Needs Attention';
+    if (score >= 55) return 'Attention';
+    return 'Attention';
   }
 }

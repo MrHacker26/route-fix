@@ -33,7 +33,7 @@ final class AutoFixProviderAdapter extends PlatformFixProvider {
             kind: action.kind,
             title: FixType.restoreDefault.displayTitle,
             description:
-                'Undo Auto Fix changes and restore default network settings.',
+                'Undo temporary changes and return to normal settings.',
             availability: action.availability == FixAvailability.available &&
                     platform == FixPlatform.windows
                 ? FixAvailability.requiresElevation
@@ -56,8 +56,7 @@ final class AutoFixProviderAdapter extends PlatformFixProvider {
             kind: action.kind,
             title: FixType.preferIpv4.displayTitle,
             description:
-                'RouteFix detected an IPv6 routing issue. '
-                'Temporarily preferring IPv4 may improve connectivity on this network.',
+                'IPv6 looks unreliable on this network. Prefer IPv4 for now.',
             availability: action.availability,
             supportedPlatforms: action.supportedPlatforms,
             relatedIssueCodes: action.relatedIssueCodes,

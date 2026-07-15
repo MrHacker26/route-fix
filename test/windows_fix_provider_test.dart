@@ -21,7 +21,7 @@ void main() {
           actions.firstWhere((a) => a.kind == FixActionKind.enableIpv6);
 
       expect(disable.title, 'Prefer IPv4');
-      expect(enable.title, 'Restore Default Network Configuration');
+      expect(enable.title, 'Restore defaults');
       expect(disable.availability, FixAvailability.requiresElevation);
       expect(enable.availability, FixAvailability.requiresElevation);
     });
@@ -69,7 +69,7 @@ void main() {
 
       final result = await provider.apply(FixActionKind.disableIpv6);
       expect(result.success, isFalse);
-      expect(result.message, contains('administrator permission'));
+      expect(result.message, contains('Admin access'));
       expect(result.error, contains('Access is denied'));
     });
 

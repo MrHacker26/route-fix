@@ -36,12 +36,12 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
       FixType.preferIpv4 => _applySysctl(
           kind: FixActionKind.disableIpv6,
           settings: _preferSettings,
-          successMessage: 'Prefer IPv4 applied via sysctl.',
+          successMessage: 'Prefer IPv4 is on.',
         ),
       FixType.restoreDefault => _applySysctl(
           kind: FixActionKind.enableIpv6,
           settings: _restoreSettings,
-          successMessage: 'Network defaults restored via sysctl.',
+          successMessage: 'Defaults restored.',
         ),
       _ => FixResult.notImplemented(
           type.toFixActionKind ?? FixActionKind.disableIpv6,
@@ -73,7 +73,7 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
       } on AutoFixException catch (error) {
         return FixResult.failure(
           kind,
-          message: 'Could not update network settings.',
+          message: 'Couldn’t update network settings.',
           error: error.message,
           executed: false,
           platform: platform,
@@ -99,8 +99,8 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
         return FixResult.failure(
           kind,
           message: permission
-              ? 'RouteFix needs administrator permission to continue.'
-              : 'Could not update network settings.',
+              ? 'Admin access is required.'
+              : 'Couldn’t update network settings.',
           error: detail,
           platform: platform,
           requiresElevation: true,

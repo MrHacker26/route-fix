@@ -1,0 +1,75 @@
+name: Bug report
+description: Something isn’t working as expected.
+title: "[Bug]: "
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve RouteFix. Fill in only what’s relevant.
+
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What went wrong?
+      placeholder: Prefer IPv4 Auto Fix failed after entering my password…
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Minimal steps someone else can follow.
+      placeholder: |
+        1. Open RouteFix
+        2. …
+        3. …
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected
+      placeholder: What you expected to happen.
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual
+      placeholder: What actually happened. Include error text if shown.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - macOS
+        - Windows
+        - Linux
+        - Multiple / unsure
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: RouteFix version
+      description: From Settings → About RouteFix.
+      placeholder: 1.0.0
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Extra context
+      description: Logs, screenshots, or Technical details (optional).
+    validations:
+      required: false

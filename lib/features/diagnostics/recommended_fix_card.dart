@@ -75,7 +75,7 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
         _failureTechnical = error.toString();
         _failureMessage = HumanMessage.fromProbeError(
           error.toString(),
-          fallback: 'We couldn’t apply that change just now.',
+          fallback: 'Couldn’t apply that change.',
         );
       });
       return;
@@ -101,8 +101,9 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
       await showAutoFixSuccessDialog(context);
       if (!mounted) return;
       widget.onApplied?.call();
-      // Automatically re-run diagnostics and refresh the dashboard / results.
-      widget.onRerunDiagnostics?.call();
+      if (AppServices.settings.settings.autoRerunAfterFixes) {
+        widget.onRerunDiagnostics?.call();
+      }
       return;
     }
 
@@ -115,7 +116,7 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
       ].where((part) => part.trim().isNotEmpty).join('\n');
       _failureMessage = HumanMessage.fromProbeError(
         result.message ?? result.error,
-        fallback: 'That change didn’t go through. You can try again.',
+        fallback: 'That change didn’t go through. Try again.',
       );
     });
   }
@@ -168,7 +169,7 @@ class _RecommendationBody extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            compact ? 'Possible action' : 'Recommended Fix',
+            compact ? 'Suggestion' : 'Recommended',
             style: text.labelMedium?.copyWith(
               color: AppColors.onSurfaceMuted,
               letterSpacing: 0.2,
@@ -204,7 +205,7 @@ class _RecommendationBody extends StatelessWidget {
           ),
           if (!compact) ...[
             const SizedBox(height: AppSpacing.sm),
-            _LabeledBlock(label: 'What we saw', value: fix.why),
+            _LabeledBlock(label: 'Evidence', value: fix.why),
             const SizedBox(height: AppSpacing.xs),
             Text(
               'Confidence · ${fix.confidenceLabel}',
@@ -216,27 +217,7 @@ class _RecommendationBody extends StatelessWidget {
           ],
           if (loading) ...[
             const SizedBox(height: AppSpacing.lg),
-            Row(
-              children: [
-                const SizedBox(
-                  width: AppSpacing.iconRow,
-                  height: AppSpacing.iconRow,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 2,
-                    color: AppColors.primary,
-                  ),
-                ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Text(
-                    progressLabel,
-                    style: text.bodyMedium?.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ],
-            ),
+            InlineProgress(label: progressLabel),
           ],
           if (failureMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
@@ -258,7 +239,7 @@ class _RecommendationBody extends StatelessWidget {
                   child: ExpansionTile(
                     tilePadding: EdgeInsets.zero,
                     title: Text(
-                      'View technical details',
+                      'Technical details',
                       style:
                           text.labelMedium?.copyWith(color: AppColors.primary),
                     ),
@@ -288,7 +269,7 @@ class _RecommendationBody extends StatelessWidget {
             child: PrimaryButton(
               label: loading
                   ? progressLabel
-                  : (compact ? 'Apply Fix' : 'Apply Fix'),
+                  : (compact ? 'Apply' : 'Apply'),
               icon: loading ? null : Icons.auto_fix_high_outlined,
               expanded: true,
               onPressed: (!fix.canConfirmApply || loading) ? null : onApply,
@@ -322,14 +303,14 @@ class _SuccessBody extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.xs),
               Text(
-                'Network Updated',
+                'Done',
                 style: text.titleMedium?.copyWith(color: AppColors.success),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'The recommended fix was successfully applied.',
+            'Your network settings were updated.',
             style: text.bodyMedium?.copyWith(
               color: AppColors.onSurfaceVariant,
               height: 1.45,
@@ -339,7 +320,7 @@ class _SuccessBody extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: PrimaryButton(
-              label: 'Run Again',
+              label: 'Scan again',
               icon: Icons.refresh_rounded,
               expanded: true,
               onPressed: onRerunDiagnostics,
