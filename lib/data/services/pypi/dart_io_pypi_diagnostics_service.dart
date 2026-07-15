@@ -51,6 +51,7 @@ class DartIoPypiDiagnosticsService implements PypiDiagnosticsService {
       failure: probed.failure,
       stageReached: probed.stageReached,
       stageFailed: probed.stageFailed,
+      timings: probed.timings,
     );
   }
 }

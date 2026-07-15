@@ -4,6 +4,7 @@ import 'dart:io';
 import '../../../core/errors/app_failure.dart';
 import '../../../domain/models/ipv6_connectivity_result.dart';
 import '../../../domain/models/probe_stage.dart';
+import '../../../domain/models/probe_timings.dart';
 import '../../../domain/services/ipv6_connectivity_service.dart';
 import '../probe_failure_mapper.dart';
 
@@ -35,6 +36,8 @@ class DartIoIpv6ConnectivityService implements Ipv6ConnectivityService {
       );
     }
 
+    var timings = ProbeTimings.empty;
+
     final dnsWatch = Stopwatch()..start();
     late final InternetAddress address;
     try {
@@ -48,43 +51,51 @@ class DartIoIpv6ConnectivityService implements Ipv6ConnectivityService {
           .toList(growable: false);
 
       dnsWatch.stop();
+      timings = timings.copyWith(dns: dnsWatch.elapsed);
 
       if (ipv6.isEmpty) {
         return Ipv6ConnectivityResult(
           success: false,
-          latency: dnsWatch.elapsed,
+          latency: timings.dns,
           stageFailed: ProbeStage.dns,
           failure: DNSFailure('No IPv6 address found for "$host"'),
+          timings: timings,
         );
       }
 
       address = ipv6.first;
     } on TimeoutException {
       dnsWatch.stop();
+      timings = timings.copyWith(dns: dnsWatch.elapsed);
       return Ipv6ConnectivityResult(
         success: false,
-        latency: dnsWatch.elapsed,
+        latency: timings.dns,
         stageFailed: ProbeStage.dns,
         failure: const TimeoutFailure('IPv6 DNS lookup timed out'),
+        timings: timings,
       );
     } on SocketException catch (error) {
       dnsWatch.stop();
+      timings = timings.copyWith(dns: dnsWatch.elapsed);
       return Ipv6ConnectivityResult(
         success: false,
-        latency: dnsWatch.elapsed,
+        latency: timings.dns,
         stageFailed: ProbeStage.dns,
         failure: ProbeFailureMapper.fromSocketException(
           error,
           stage: ProbeStage.dns,
         ),
+        timings: timings,
       );
     } catch (error) {
       dnsWatch.stop();
+      timings = timings.copyWith(dns: dnsWatch.elapsed);
       return Ipv6ConnectivityResult(
         success: false,
-        latency: dnsWatch.elapsed,
+        latency: timings.dns,
         stageFailed: ProbeStage.dns,
         failure: ProbeFailureMapper.unknown(error),
+        timings: timings,
       );
     }
 
@@ -98,28 +109,33 @@ class DartIoIpv6ConnectivityService implements Ipv6ConnectivityService {
         timeout: timeout,
       );
       tcpWatch.stop();
+      timings = timings.copyWith(tcp: tcpWatch.elapsed);
 
       return Ipv6ConnectivityResult(
         success: true,
-        latency: tcpWatch.elapsed,
+        latency: timings.tcp,
         resolvedAddress: address.address,
         stageReached: ProbeStage.tcp,
+        timings: timings,
       );
     } on TimeoutException {
       tcpWatch.stop();
+      timings = timings.copyWith(tcp: tcpWatch.elapsed);
       return Ipv6ConnectivityResult(
         success: false,
-        latency: tcpWatch.elapsed,
+        latency: timings.tcp,
         resolvedAddress: address.address,
         stageReached: ProbeStage.dns,
         stageFailed: ProbeStage.tcp,
         failure: const TimeoutFailure('IPv6 connect timed out'),
+        timings: timings,
       );
     } on SocketException catch (error) {
       tcpWatch.stop();
+      timings = timings.copyWith(tcp: tcpWatch.elapsed);
       return Ipv6ConnectivityResult(
         success: false,
-        latency: tcpWatch.elapsed,
+        latency: timings.tcp,
         resolvedAddress: address.address,
         stageReached: ProbeStage.dns,
         stageFailed: ProbeStage.tcp,
@@ -127,16 +143,19 @@ class DartIoIpv6ConnectivityService implements Ipv6ConnectivityService {
           error,
           stage: ProbeStage.tcp,
         ),
+        timings: timings,
       );
     } catch (error) {
       tcpWatch.stop();
+      timings = timings.copyWith(tcp: tcpWatch.elapsed);
       return Ipv6ConnectivityResult(
         success: false,
-        latency: tcpWatch.elapsed,
+        latency: timings.tcp,
         resolvedAddress: address.address,
         stageReached: ProbeStage.dns,
         stageFailed: ProbeStage.tcp,
         failure: ProbeFailureMapper.unknown(error),
+        timings: timings,
       );
     } finally {
       await socket?.close();

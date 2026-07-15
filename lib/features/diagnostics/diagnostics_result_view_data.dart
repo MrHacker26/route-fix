@@ -215,14 +215,18 @@ final class DiagnosticsResultViewData {
     required List<DiagnosticIssue> relatedIssues,
   }) {
     if (action.kind == FixActionKind.disableIpv6) {
-      final ipv4Ms = double.tryParse(report.metadata['ipv4_latency_ms'] ?? '');
-      final ipv6Ms = double.tryParse(report.metadata['ipv6_latency_ms'] ?? '');
+      final ipv4Ms = double.tryParse(
+        report.metadata['ipv4_tcp_ms'] ?? report.metadata['ipv4_latency_ms'] ?? '',
+      );
+      final ipv6Ms = double.tryParse(
+        report.metadata['ipv6_tcp_ms'] ?? report.metadata['ipv6_latency_ms'] ?? '',
+      );
       if (ipv4Ms != null && ipv6Ms != null && ipv4Ms > 0 && ipv6Ms > ipv4Ms) {
         final ratio = ipv6Ms / ipv4Ms;
         final formatted = ratio >= 2
             ? ratio.round().toString()
             : ratio.toStringAsFixed(1);
-        return 'IPv6 is responding about $formatted× slower than IPv4 right now.';
+        return 'IPv6 TCP connect is about $formatted× slower than IPv4 right now.';
       }
     }
 
@@ -242,7 +246,7 @@ final class DiagnosticsResultViewData {
   }) {
     return switch (action.kind) {
       FixActionKind.disableIpv6 =>
-        'Preferring IPv4 can help apps skip a slow IPv6 path and feel snappier for tools that use the network.',
+        'Preferring IPv4 can help apps skip a slow IPv6 TCP path and feel snappier for tools that use the network.',
       FixActionKind.enableIpv6 =>
         'Turning IPv6 back on can restore normal dual-stack routing when something disabled it earlier.',
       FixActionKind.flushDns =>
@@ -274,8 +278,12 @@ final class DiagnosticsResultViewData {
     required List<DiagnosticIssue> relatedIssues,
   }) {
     if (action.kind == FixActionKind.disableIpv6) {
-      final ipv4Ms = double.tryParse(report.metadata['ipv4_latency_ms'] ?? '');
-      final ipv6Ms = double.tryParse(report.metadata['ipv6_latency_ms'] ?? '');
+      final ipv4Ms = double.tryParse(
+        report.metadata['ipv4_tcp_ms'] ?? report.metadata['ipv4_latency_ms'] ?? '',
+      );
+      final ipv6Ms = double.tryParse(
+        report.metadata['ipv6_tcp_ms'] ?? report.metadata['ipv6_latency_ms'] ?? '',
+      );
       if (ipv4Ms != null && ipv6Ms != null && ipv4Ms > 0) {
         final ratio = ipv6Ms / ipv4Ms;
         if (ratio >= 5) return 'High';
@@ -395,16 +403,42 @@ final class DiagnosticsResultViewData {
   static List<NetworkMetricView> _networkMetricsFrom(Map<String, String> meta) {
     final metrics = <NetworkMetricView>[];
 
+    final dnsMs = meta['dns_lookup_ms'];
+    if (dnsMs != null || meta.containsKey('dns_success')) {
+      final dnsOk = meta['dns_success'] != 'false';
+      metrics.add(
+        NetworkMetricView(
+          title: 'DNS lookup',
+          value: dnsOk
+              ? (dnsMs != null ? '$dnsMs ms' : 'Resolved')
+              : 'Failed',
+          detail: dnsOk
+              ? 'Name resolution time'
+              : HumanMessage.fromProbeError(
+                  meta['dns_error'],
+                  fallback: 'Couldn’t resolve the hostname',
+                ),
+          tone: dnsOk ? StatusBadgeTone.success : StatusBadgeTone.error,
+          icon: Icons.dns_outlined,
+          technicalDetail: [
+            if (dnsMs != null) 'dns_lookup_ms=$dnsMs',
+            if (meta['dns_error'] != null) meta['dns_error']!,
+          ].join('\n'),
+        ),
+      );
+    }
+
     final ipv4Ok = meta['ipv4_success'] == 'true';
-    final ipv4Ms = meta['ipv4_latency_ms'];
+    final ipv4TcpMs = meta['ipv4_tcp_ms'] ?? meta['ipv4_latency_ms'];
+    final ipv4DnsMs = meta['ipv4_dns_ms'];
     metrics.add(
       NetworkMetricView(
-        title: 'IPv4',
+        title: 'IPv4 connect',
         value: ipv4Ok
-            ? (ipv4Ms != null ? '$ipv4Ms ms' : 'Reachable')
+            ? (ipv4TcpMs != null ? '$ipv4TcpMs ms' : 'Reachable')
             : 'Unavailable',
         detail: ipv4Ok
-            ? 'Working path for most tools'
+            ? 'TCP connect time'
             : HumanMessage.fromProbeError(
                 meta['ipv4_error'],
                 fallback: 'Couldn’t complete an IPv4 check',
@@ -412,6 +446,8 @@ final class DiagnosticsResultViewData {
         tone: ipv4Ok ? StatusBadgeTone.success : StatusBadgeTone.error,
         icon: Icons.public_rounded,
         technicalDetail: [
+          if (ipv4DnsMs != null) 'DNS: $ipv4DnsMs ms',
+          if (ipv4TcpMs != null) 'TCP: $ipv4TcpMs ms',
           if (meta['ipv4_address'] != null) 'Address: ${meta['ipv4_address']}',
           if (meta['ipv4_error'] != null) meta['ipv4_error']!,
         ].join('\n'),
@@ -419,30 +455,33 @@ final class DiagnosticsResultViewData {
     );
 
     final ipv6Ok = meta['ipv6_success'] == 'true';
-    final ipv6Ms = meta['ipv6_latency_ms'];
-    if (meta.containsKey('ipv6_success') || ipv6Ms != null) {
+    final ipv6TcpMs = meta['ipv6_tcp_ms'] ?? meta['ipv6_latency_ms'];
+    final ipv6DnsMs = meta['ipv6_dns_ms'];
+    if (meta.containsKey('ipv6_success') || ipv6TcpMs != null) {
       metrics.add(
         NetworkMetricView(
-          title: 'IPv6',
+          title: 'IPv6 connect',
           value: ipv6Ok
-              ? (ipv6Ms != null ? '$ipv6Ms ms' : 'Reachable')
+              ? (ipv6TcpMs != null ? '$ipv6TcpMs ms' : 'Reachable')
               : 'Unavailable',
           detail: ipv6Ok
-              ? 'Secondary path used by some services'
+              ? 'TCP connect time'
               : HumanMessage.fromProbeError(
                   meta['ipv6_error'],
                   fallback: 'Couldn’t complete an IPv6 check',
                 ),
           tone: ipv6Ok
-              ? (ipv6Ms != null &&
-                      ipv4Ms != null &&
-                      (double.tryParse(ipv6Ms) ?? 0) >
-                          (double.tryParse(ipv4Ms) ?? 0) * 2
+              ? (ipv6TcpMs != null &&
+                      ipv4TcpMs != null &&
+                      (double.tryParse(ipv6TcpMs) ?? 0) >
+                          (double.tryParse(ipv4TcpMs) ?? 0) * 2
                   ? StatusBadgeTone.warning
                   : StatusBadgeTone.success)
               : StatusBadgeTone.warning,
           icon: Icons.hub_outlined,
           technicalDetail: [
+            if (ipv6DnsMs != null) 'DNS: $ipv6DnsMs ms',
+            if (ipv6TcpMs != null) 'TCP: $ipv6TcpMs ms',
             if (meta['ipv6_address'] != null)
               'Address: ${meta['ipv6_address']}',
             if (meta['ipv6_error'] != null) meta['ipv6_error']!,
@@ -453,16 +492,17 @@ final class DiagnosticsResultViewData {
 
     final cfOk = meta['cloudflare_success'] != 'false';
     if (meta.containsKey('cloudflare_success') ||
+        meta.containsKey('cloudflare_http_ms') ||
         meta.containsKey('cloudflare_latency_ms')) {
-      final cfMs = meta['cloudflare_latency_ms'];
+      final cfHttpMs = meta['cloudflare_http_ms'] ?? meta['cloudflare_latency_ms'];
       metrics.add(
         NetworkMetricView(
-          title: 'Internet edge',
+          title: 'HTTPS response',
           value: cfOk
-              ? (cfMs != null ? '$cfMs ms' : 'Reachable')
+              ? (cfHttpMs != null ? '$cfHttpMs ms' : 'Reachable')
               : 'Unavailable',
           detail: cfOk
-              ? 'General internet path check'
+              ? 'HTTP status-line time (after DNS / TCP / TLS)'
               : HumanMessage.fromProbeError(
                   meta['cloudflare_error'],
                   fallback: 'Edge check didn’t complete',
@@ -470,6 +510,13 @@ final class DiagnosticsResultViewData {
           tone: cfOk ? StatusBadgeTone.success : StatusBadgeTone.warning,
           icon: Icons.cloud_outlined,
           technicalDetail: [
+            if (meta['cloudflare_dns_ms'] != null)
+              'DNS: ${meta['cloudflare_dns_ms']} ms',
+            if (meta['cloudflare_tcp_ms'] != null)
+              'TCP: ${meta['cloudflare_tcp_ms']} ms',
+            if (meta['cloudflare_tls_ms'] != null)
+              'TLS: ${meta['cloudflare_tls_ms']} ms',
+            if (cfHttpMs != null) 'HTTP: $cfHttpMs ms',
             if (meta['cloudflare_http_status'] != null)
               'HTTP ${meta['cloudflare_http_status']}',
             if (meta['cloudflare_error'] != null) meta['cloudflare_error']!,
@@ -514,6 +561,7 @@ final class DiagnosticsResultViewData {
       for (final entry in meta.entries)
         if (entry.key.contains('error') ||
             entry.key.contains('latency') ||
+            entry.key.endsWith('_ms') ||
             entry.key.contains('address') ||
             entry.key.contains('status') ||
             entry.key.startsWith('rules_'))

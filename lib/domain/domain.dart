@@ -16,6 +16,7 @@ export 'models/issue.dart';
 export 'models/latency_sample.dart';
 export 'models/pypi_diagnostics_result.dart';
 export 'models/probe_stage.dart';
+export 'models/probe_timings.dart';
 export 'models/scan_session.dart';
 export 'repositories/connection_repository.dart';
 export 'repositories/diagnostics_repository.dart';

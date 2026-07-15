@@ -34,8 +34,10 @@ final class DashboardViewData {
     final ipv4Ok = meta['ipv4_success'] == 'true';
     final hostname = meta['target_hostname'] ?? 'network';
     final ipv4Address = meta['ipv4_address'] ?? '—';
-    final ipv4Latency = meta['ipv4_latency_ms'];
+    final ipv4TcpMs = meta['ipv4_tcp_ms'] ?? meta['ipv4_latency_ms'];
     final cloudflareStatus = meta['cloudflare_http_status'] ?? '—';
+    final cloudflareHttpMs =
+        meta['cloudflare_http_ms'] ?? meta['cloudflare_latency_ms'];
 
     final connection = ConnectionStatusView(
       title: ipv4Ok ? 'Connected' : 'Connection needs a look',
@@ -76,9 +78,10 @@ final class DashboardViewData {
         ),
         SummaryItemView(
           title: 'Internet path',
-          detail: ipv4Latency == null
+          detail: ipv4TcpMs == null
               ? 'Edge check completed'
-              : 'About $ipv4Latency ms · status $cloudflareStatus',
+              : 'IPv4 connect $ipv4TcpMs ms · HTTPS '
+                  '${cloudflareHttpMs ?? cloudflareStatus}',
           tone: StatusBadgeTone.success,
           badge: 'OK',
           icon: Icons.cloud_outlined,

@@ -5,10 +5,10 @@ import 'package:route_fix/core/errors/app_failure.dart';
 import 'package:route_fix/data/services/http/dart_io_http_probe_service.dart';
 import 'package:route_fix/domain/models/probe_stage.dart';
 
-void main() {
+      void main() {
   const service = DartIoHttpProbeService();
 
-  test('stages through DNS → TCP → HTTP on local server', () async {
+  test('stages through DNS → TCP → HTTP with per-stage timings', () async {
     final server = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
     addTearDown(server.close);
 
@@ -33,7 +33,11 @@ void main() {
     expect(result.stageReached, ProbeStage.http);
     expect(result.stageFailed, isNull);
     expect(result.failure, isNull);
-    expect(result.latency, isNotNull);
+    expect(result.timings.dns, isNotNull);
+    expect(result.timings.tcp, isNotNull);
+    expect(result.timings.tls, isNull); // plaintext HTTP
+    expect(result.timings.http, isNotNull);
+    expect(result.latency, result.timings.http);
     expect(result.latency! >= Duration.zero, isTrue);
   });
 

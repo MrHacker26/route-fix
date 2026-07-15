@@ -1,5 +1,6 @@
 import '../../core/errors/app_failure.dart';
 import 'probe_stage.dart';
+import 'probe_timings.dart';
 
 /// Outcome of an IPv6 connectivity check against a hostname.
 class Ipv6ConnectivityResult {
@@ -10,11 +11,13 @@ class Ipv6ConnectivityResult {
     this.failure,
     this.stageReached,
     this.stageFailed,
+    this.timings = ProbeTimings.empty,
   });
 
   final bool success;
 
   /// Elapsed time for the terminal stage (TCP connect on success).
+  /// Prefer [timings] for DNS vs TCP breakdowns.
   final Duration? latency;
 
   final String? resolvedAddress;
@@ -27,6 +30,9 @@ class Ipv6ConnectivityResult {
 
   /// Stage where the probe stopped with a failure (null on full success).
   final ProbeStage? stageFailed;
+
+  /// Per-stage wall times (DNS / TCP).
+  final ProbeTimings timings;
 
   /// Message form of [failure] for existing call sites.
   String? get error => failure?.message;

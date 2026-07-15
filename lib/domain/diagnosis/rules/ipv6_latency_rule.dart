@@ -79,7 +79,7 @@ final class Ipv6LatencyRule implements DiagnosisRule<DualStackObservation> {
         id: 'ipv6-latency-high',
         title: 'Prefer IPv4',
         detail:
-            'IPv6 connected, but took about ${ipv6Ms} ms versus ${ipv4Ms} ms '
+            'IPv6 TCP connect took about ${ipv6Ms} ms versus ${ipv4Ms} ms '
             'on IPv4 (${ratio.toStringAsFixed(1)}× slower). Preferring IPv4 '
             'usually makes everyday developer tools feel snappier.',
         priority: DiagnosticSeverity.medium,
@@ -87,6 +87,8 @@ final class Ipv6LatencyRule implements DiagnosisRule<DualStackObservation> {
         metadata: {
           'fix_kind': 'disable_ipv6',
           'evidence': 'ipv6_significantly_slower',
+          'ipv4_tcp_ms': '$ipv4Ms',
+          'ipv6_tcp_ms': '$ipv6Ms',
           'ipv4_latency_ms': '$ipv4Ms',
           'ipv6_latency_ms': '$ipv6Ms',
         },

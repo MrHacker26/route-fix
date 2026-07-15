@@ -31,7 +31,9 @@ void main() {
     expect(result.resolvedAddress, anyOf('127.0.0.1', '::ffff:127.0.0.1'));
     expect(result.stageReached, ProbeStage.tcp);
     expect(result.stageFailed, isNull);
-    expect(result.latency, isNotNull);
+    expect(result.timings.dns, isNotNull);
+    expect(result.timings.tcp, isNotNull);
+    expect(result.latency, result.timings.tcp);
     expect(result.latency! >= Duration.zero, isTrue);
   });
 

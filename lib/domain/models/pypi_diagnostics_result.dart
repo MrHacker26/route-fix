@@ -1,5 +1,6 @@
 import '../../core/errors/app_failure.dart';
 import 'probe_stage.dart';
+import 'probe_timings.dart';
 
 /// HTTP probe outcome tagged with the target hostname.
 class HostHttpProbeResult {
@@ -11,6 +12,7 @@ class HostHttpProbeResult {
     this.failure,
     this.stageReached,
     this.stageFailed,
+    this.timings = ProbeTimings.empty,
   });
 
   final String hostname;
@@ -20,6 +22,7 @@ class HostHttpProbeResult {
   final AppFailure? failure;
   final ProbeStage? stageReached;
   final ProbeStage? stageFailed;
+  final ProbeTimings timings;
 
   /// Message form of [failure] for existing call sites.
   String? get error => failure?.message;

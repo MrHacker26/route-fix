@@ -6,10 +6,11 @@ import 'dart:typed_data';
 import '../../../core/errors/app_failure.dart';
 import '../../../domain/models/http_probe_result.dart';
 import '../../../domain/models/probe_stage.dart';
+import '../../../domain/models/probe_timings.dart';
 import '../../../domain/services/http_probe_service.dart';
 import '../probe_failure_mapper.dart';
 
-/// Generic HTTP(S) probe with explicit DNS → TCP → TLS → HTTP stages.
+/// Generic HTTP(S) probe with explicit DNS → TCP → TLS → HTTP timings.
 class DartIoHttpProbeService implements HttpProbeService {
   const DartIoHttpProbeService();
 
@@ -35,6 +36,7 @@ class DartIoHttpProbeService implements HttpProbeService {
 
     final useTls = uri.isScheme('https');
     final port = uri.port;
+    var timings = ProbeTimings.empty;
 
     // --- DNS ---
     final dnsWatch = Stopwatch()..start();
@@ -42,10 +44,10 @@ class DartIoHttpProbeService implements HttpProbeService {
     try {
       final addresses = await InternetAddress.lookup(host).timeout(timeout);
       dnsWatch.stop();
+      timings = timings.copyWith(dns: dnsWatch.elapsed);
       if (addresses.isEmpty) {
-        return HttpProbeResult(
-          success: false,
-          latency: dnsWatch.elapsed,
+        return _fail(
+          timings: timings,
           stageFailed: ProbeStage.dns,
           failure: DNSFailure('No addresses found for "$host"'),
         );
@@ -53,17 +55,17 @@ class DartIoHttpProbeService implements HttpProbeService {
       address = addresses.first;
     } on TimeoutException {
       dnsWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: dnsWatch.elapsed,
+      timings = timings.copyWith(dns: dnsWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageFailed: ProbeStage.dns,
         failure: const TimeoutFailure('DNS lookup timed out'),
       );
     } on SocketException catch (error) {
       dnsWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: dnsWatch.elapsed,
+      timings = timings.copyWith(dns: dnsWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageFailed: ProbeStage.dns,
         failure: ProbeFailureMapper.fromSocketException(
           error,
@@ -72,9 +74,9 @@ class DartIoHttpProbeService implements HttpProbeService {
       );
     } catch (error) {
       dnsWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: dnsWatch.elapsed,
+      timings = timings.copyWith(dns: dnsWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageFailed: ProbeStage.dns,
         failure: ProbeFailureMapper.unknown(error),
       );
@@ -86,20 +88,21 @@ class DartIoHttpProbeService implements HttpProbeService {
     try {
       socket = await Socket.connect(address, port, timeout: timeout);
       tcpWatch.stop();
+      timings = timings.copyWith(tcp: tcpWatch.elapsed);
     } on TimeoutException {
       tcpWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: tcpWatch.elapsed,
+      timings = timings.copyWith(tcp: tcpWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageReached: ProbeStage.dns,
         stageFailed: ProbeStage.tcp,
         failure: const TimeoutFailure('TCP connect timed out'),
       );
     } on SocketException catch (error) {
       tcpWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: tcpWatch.elapsed,
+      timings = timings.copyWith(tcp: tcpWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageReached: ProbeStage.dns,
         stageFailed: ProbeStage.tcp,
         failure: ProbeFailureMapper.fromSocketException(
@@ -109,10 +112,10 @@ class DartIoHttpProbeService implements HttpProbeService {
       );
     } catch (error) {
       tcpWatch.stop();
+      timings = timings.copyWith(tcp: tcpWatch.elapsed);
       await socket?.close();
-      return HttpProbeResult(
-        success: false,
-        latency: tcpWatch.elapsed,
+      return _fail(
+        timings: timings,
         stageReached: ProbeStage.dns,
         stageFailed: ProbeStage.tcp,
         failure: ProbeFailureMapper.unknown(error),
@@ -131,34 +134,35 @@ class DartIoHttpProbeService implements HttpProbeService {
           host: host,
         ).timeout(timeout);
         tlsWatch.stop();
+        timings = timings.copyWith(tls: tlsWatch.elapsed);
         stageReached = ProbeStage.tls;
         socket = null; // owned by SecureSocket
       } on TimeoutException {
         tlsWatch.stop();
+        timings = timings.copyWith(tls: tlsWatch.elapsed);
         await _closeQuietly(socket);
-        return HttpProbeResult(
-          success: false,
-          latency: tlsWatch.elapsed,
+        return _fail(
+          timings: timings,
           stageReached: ProbeStage.tcp,
           stageFailed: ProbeStage.tls,
           failure: const TimeoutFailure('TLS handshake timed out'),
         );
       } on HandshakeException catch (error) {
         tlsWatch.stop();
+        timings = timings.copyWith(tls: tlsWatch.elapsed);
         await _closeQuietly(socket);
-        return HttpProbeResult(
-          success: false,
-          latency: tlsWatch.elapsed,
+        return _fail(
+          timings: timings,
           stageReached: ProbeStage.tcp,
           stageFailed: ProbeStage.tls,
           failure: ProbeFailureMapper.fromHandshake(error),
         );
       } on SocketException catch (error) {
         tlsWatch.stop();
+        timings = timings.copyWith(tls: tlsWatch.elapsed);
         await _closeQuietly(socket);
-        return HttpProbeResult(
-          success: false,
-          latency: tlsWatch.elapsed,
+        return _fail(
+          timings: timings,
           stageReached: ProbeStage.tcp,
           stageFailed: ProbeStage.tls,
           failure: ProbeFailureMapper.fromSocketException(
@@ -168,10 +172,10 @@ class DartIoHttpProbeService implements HttpProbeService {
         );
       } on TlsException catch (error) {
         tlsWatch.stop();
+        timings = timings.copyWith(tls: tlsWatch.elapsed);
         await _closeQuietly(socket);
-        return HttpProbeResult(
-          success: false,
-          latency: tlsWatch.elapsed,
+        return _fail(
+          timings: timings,
           stageReached: ProbeStage.tcp,
           stageFailed: ProbeStage.tls,
           failure: TLSFailure(
@@ -182,10 +186,10 @@ class DartIoHttpProbeService implements HttpProbeService {
         );
       } catch (error) {
         tlsWatch.stop();
+        timings = timings.copyWith(tls: tlsWatch.elapsed);
         await _closeQuietly(socket);
-        return HttpProbeResult(
-          success: false,
-          latency: tlsWatch.elapsed,
+        return _fail(
+          timings: timings,
           stageReached: ProbeStage.tcp,
           stageFailed: ProbeStage.tls,
           failure: ProbeFailureMapper.unknown(error),
@@ -203,39 +207,41 @@ class DartIoHttpProbeService implements HttpProbeService {
         timeout: timeout,
       );
       httpWatch.stop();
+      timings = timings.copyWith(http: httpWatch.elapsed);
 
       final ok = status >= 200 && status < 400;
       return HttpProbeResult(
         success: ok,
-        latency: httpWatch.elapsed,
+        latency: timings.http,
         httpStatus: status,
         stageReached: ProbeStage.http,
         stageFailed: ok ? null : ProbeStage.http,
         failure: ok ? null : ProbeFailureMapper.unexpectedHttpStatus(status),
+        timings: timings,
       );
     } on TimeoutException {
       httpWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: httpWatch.elapsed,
+      timings = timings.copyWith(http: httpWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageReached: stageReached,
         stageFailed: ProbeStage.http,
         failure: const TimeoutFailure('HTTP probe timed out'),
       );
     } on HttpException catch (error) {
       httpWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: httpWatch.elapsed,
+      timings = timings.copyWith(http: httpWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageReached: stageReached,
         stageFailed: ProbeStage.http,
         failure: ProbeFailureMapper.fromHttpException(error),
       );
     } on SocketException catch (error) {
       httpWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: httpWatch.elapsed,
+      timings = timings.copyWith(http: httpWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageReached: stageReached,
         stageFailed: ProbeStage.http,
         failure: ProbeFailureMapper.fromSocketException(
@@ -245,9 +251,9 @@ class DartIoHttpProbeService implements HttpProbeService {
       );
     } catch (error) {
       httpWatch.stop();
-      return HttpProbeResult(
-        success: false,
-        latency: httpWatch.elapsed,
+      timings = timings.copyWith(http: httpWatch.elapsed);
+      return _fail(
+        timings: timings,
         stageReached: stageReached,
         stageFailed: ProbeStage.http,
         failure: ProbeFailureMapper.unknown(error),
@@ -255,6 +261,22 @@ class DartIoHttpProbeService implements HttpProbeService {
     } finally {
       await _closeQuietly(transport);
     }
+  }
+
+  HttpProbeResult _fail({
+    required ProbeTimings timings,
+    required ProbeStage stageFailed,
+    required AppFailure failure,
+    ProbeStage? stageReached,
+  }) {
+    return HttpProbeResult(
+      success: false,
+      latency: timings.terminal,
+      stageReached: stageReached,
+      stageFailed: stageFailed,
+      failure: failure,
+      timings: timings,
+    );
   }
 
   Future<int> _exchangeHttpStatus(
@@ -306,7 +328,6 @@ class DartIoHttpProbeService implements HttpProbeService {
   }
 
   int _parseStatusCode(String statusLine) {
-    // HTTP/1.1 200 OK
     final parts = statusLine.trim().split(RegExp(r'\s+'));
     if (parts.length < 2) {
       throw HttpException('Invalid HTTP status line: $statusLine');

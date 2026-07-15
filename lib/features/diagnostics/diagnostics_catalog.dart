@@ -6,7 +6,10 @@ enum DiagnosticOutcome {
   info,
 }
 
-/// Presentation-only diagnostic targets for the fake scan sequence.
+/// Presentation-only diagnostic targets for the scan sequence animation.
+///
+/// [result] must never contain mocked timing numbers — live timings come from
+/// the diagnostics report after a real run.
 class DiagnosticItemData {
   const DiagnosticItemData({
     required this.id,
@@ -24,6 +27,8 @@ class DiagnosticItemData {
   final String result;
   final IconData icon;
   final DiagnosticOutcome outcome;
+
+  /// Animation pacing only — not a measured network latency.
   final Duration duration;
 }
 
@@ -32,8 +37,8 @@ abstract final class DiagnosticsCatalog {
     DiagnosticItemData(
       id: 'dns',
       label: 'DNS',
-      subtitle: 'Resolver reachability',
-      result: '24 ms · 1.1.1.1',
+      subtitle: 'Name lookup',
+      result: 'Checked',
       icon: Icons.dns_outlined,
       outcome: DiagnosticOutcome.success,
       duration: Duration(milliseconds: 720),
@@ -41,8 +46,8 @@ abstract final class DiagnosticsCatalog {
     DiagnosticItemData(
       id: 'ipv4',
       label: 'IPv4',
-      subtitle: 'Default route check',
-      result: 'Reachable · en0',
+      subtitle: 'TCP connect',
+      result: 'Checked',
       icon: Icons.filter_1_rounded,
       outcome: DiagnosticOutcome.success,
       duration: Duration(milliseconds: 640),
@@ -50,8 +55,8 @@ abstract final class DiagnosticsCatalog {
     DiagnosticItemData(
       id: 'ipv6',
       label: 'IPv6',
-      subtitle: 'Dual-stack probe',
-      result: 'No route advertised',
+      subtitle: 'TCP connect',
+      result: 'Checked',
       icon: Icons.filter_6_rounded,
       outcome: DiagnosticOutcome.warning,
       duration: Duration(milliseconds: 880),
@@ -60,7 +65,7 @@ abstract final class DiagnosticsCatalog {
       id: 'github',
       label: 'GitHub',
       subtitle: 'api.github.com',
-      result: '132 ms · elevated hop',
+      result: 'Checked',
       icon: Icons.code_outlined,
       outcome: DiagnosticOutcome.warning,
       duration: Duration(milliseconds: 1100),
@@ -68,8 +73,8 @@ abstract final class DiagnosticsCatalog {
     DiagnosticItemData(
       id: 'cloudflare',
       label: 'Cloudflare',
-      subtitle: 'Edge latency',
-      result: '18 ms · healthy',
+      subtitle: 'HTTPS path',
+      result: 'Checked',
       icon: Icons.cloud_outlined,
       outcome: DiagnosticOutcome.success,
       duration: Duration(milliseconds: 560),
@@ -78,7 +83,7 @@ abstract final class DiagnosticsCatalog {
       id: 'pypi',
       label: 'PyPI',
       subtitle: 'pypi.org',
-      result: '41 ms · stable',
+      result: 'Checked',
       icon: Icons.inventory_2_outlined,
       outcome: DiagnosticOutcome.success,
       duration: Duration(milliseconds: 760),

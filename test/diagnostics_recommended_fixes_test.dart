@@ -48,6 +48,7 @@ void main() {
       selected.secondary.map((f) => f.kind),
       isNot(contains(FixActionKind.enableIpv6)),
     );
+    expect(selected.primary?.why, contains('TCP connect'));
     expect(selected.primary?.why, contains('slower than IPv4'));
     expect(selected.primary?.confidenceLabel, '96%');
     expect(selected.primary?.backedByRuleIds, contains('ipv6_latency'));

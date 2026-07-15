@@ -49,8 +49,8 @@ final class PyPILatencyRule
               title: 'Python packages may download slowly',
               detail:
                   '${slowest.hostname} took about '
-                  '${slowest.latency!.inMilliseconds} ms to respond. '
-                  'Installs and updates can feel slower than usual.',
+                  '${slowest.latency!.inMilliseconds} ms for an HTTP status '
+                  'response. Installs and updates can feel slower than usual.',
               priority: DiagnosticSeverity.medium,
             )
           : null,
