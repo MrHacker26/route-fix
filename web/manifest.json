@@ -1,11 +1,11 @@
 {
-    "name": "route_fix",
-    "short_name": "route_fix",
+    "name": "RouteFix",
+    "short_name": "RouteFix",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#0C0C0E",
+    "theme_color": "#0C0C0E",
+    "description": "RouteFix diagnoses network routing issues for developers.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

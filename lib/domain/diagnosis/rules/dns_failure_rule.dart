@@ -25,8 +25,10 @@ final class DnsFailureRule
             confidence: 0.9,
             recommendation: Recommendation(
               id: 'dns-empty',
-              title: 'DNS returned no addresses',
-              detail: 'Lookup for "${value.hostname}" produced no A/AAAA records.',
+              title: 'Name lookup returned nothing',
+              detail:
+                  'We couldn’t find addresses for "${value.hostname}". '
+                  'Apps that need that name may stall or fail.',
               priority: DiagnosticSeverity.high,
             ),
           );
@@ -37,7 +39,7 @@ final class DnsFailureRule
           confidence: 0.95,
           recommendation: Recommendation(
             id: 'dns-failed',
-            title: 'DNS lookup failed',
+            title: 'Name lookup didn’t finish',
             detail: error.toString(),
             priority: DiagnosticSeverity.high,
           ),

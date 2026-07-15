@@ -125,8 +125,8 @@ final class DiagnosisEngine {
       severity: recommendation?.priority ?? DiagnosticSeverity.medium,
       code: evaluation.rule.id,
       metadata: {
-        'confidence': evaluation.rule.name,
-        'confidence_confidence': evaluation.result.confidence.toStringAsFixed(2),
+        'rule': evaluation.rule.id,
+        'rule_confidence': evaluation.result.confidence.toStringAsFixed(2),
       },
     );
   }

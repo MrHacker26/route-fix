@@ -39,11 +39,11 @@ final class PyPILatencyRule
       confidence: 0.88,
       recommendation: Recommendation(
         id: 'pypi-latency-high',
-        title: 'PyPI path is slow',
+        title: 'Python packages may download slowly',
         detail:
-            '${slowest.hostname} responded in '
-            '${slowest.latency!.inMilliseconds} ms '
-            '(threshold ${threshold.inMilliseconds} ms).',
+            '${slowest.hostname} took about '
+            '${slowest.latency!.inMilliseconds} ms to respond. '
+            'Installs and updates can feel slower than usual.',
         priority: DiagnosticSeverity.medium,
       ),
     );

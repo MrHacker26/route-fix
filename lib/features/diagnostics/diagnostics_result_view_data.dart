@@ -6,8 +6,9 @@ import '../../domain/autofix/models/fix_action.dart';
 import '../../domain/models/diagnostics/diagnostic_issue.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import '../../domain/models/diagnostics/diagnostic_severity.dart';
+import 'human_message.dart';
 
-/// Presentation model for the results screen — mapped from [DiagnosticReport].
+/// Presentation model for the results screen.
 final class DiagnosticsResultViewData {
   const DiagnosticsResultViewData({
     required this.overallScore,
@@ -16,12 +17,12 @@ final class DiagnosticsResultViewData {
     required this.scoreTone,
     required this.confidence,
     required this.timestampLabel,
-    required this.latencyBars,
-    required this.stabilityTrend,
-    required this.metricCards,
-    required this.issues,
-    required this.recommendations,
-    this.recommendedFixes = const [],
+    required this.networkMetrics,
+    required this.problems,
+    required this.serviceImpacts,
+    required this.technicalDetails,
+    this.primaryFix,
+    this.secondaryFixes = const [],
   });
 
   final int overallScore;
@@ -30,17 +31,17 @@ final class DiagnosticsResultViewData {
   final StatusBadgeTone scoreTone;
   final double confidence;
   final String timestampLabel;
-  final List<LatencyBarView> latencyBars;
-  final List<double> stabilityTrend;
-  final List<MetricCardView> metricCards;
-  final List<IssueView> issues;
-  final List<RecommendationView> recommendations;
-  final List<RecommendedFixView> recommendedFixes;
+  final List<NetworkMetricView> networkMetrics;
+  final List<ProblemView> problems;
+  final List<ServiceImpactView> serviceImpacts;
+  final List<TechnicalDetailView> technicalDetails;
+  final RecommendedFixView? primaryFix;
+  final List<RecommendedFixView> secondaryFixes;
 
-  bool get hasIssues => issues.isNotEmpty;
-  bool get hasRecommendations => recommendations.isNotEmpty;
-  bool get hasRecommendedFixes => recommendedFixes.isNotEmpty;
-  bool get hasMetrics => metricCards.isNotEmpty;
+  bool get hasProblems => problems.isNotEmpty;
+  bool get hasPrimaryFix => primaryFix != null;
+  bool get hasSecondaryFixes => secondaryFixes.isNotEmpty;
+  bool get hasNetworkMetrics => networkMetrics.isNotEmpty;
 
   factory DiagnosticsResultViewData.fromReport(
     DiagnosticReport report, {
@@ -49,64 +50,57 @@ final class DiagnosticsResultViewData {
     final meta = report.metadata;
     final scoreTone = _toneForScore(report.health.score);
 
-    final summary = report.health.summary ??
-        (report.issues.isEmpty
-            ? 'No issues detected. Routes look calm for this run.'
-            : '${report.issues.length} issue${report.issues.length == 1 ? '' : 's'} detected across probed services.');
+    final summary = report.issues.isEmpty
+        ? 'Your routes look calm for this check. Everyday tools should feel responsive.'
+        : report.issues.length == 1
+            ? 'We found one route issue that may slow some developer tools.'
+            : 'We found ${report.issues.length} route issues that may slow some developer tools.';
 
     final created = report.createdAt.toLocal();
     final timestamp =
         '${created.year}-${created.month.toString().padLeft(2, '0')}-${created.day.toString().padLeft(2, '0')} · '
         '${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}';
 
-    final latencyBars = _latencyBarsFrom(meta);
-    final trend = _trendFrom(report, latencyBars);
-    final cards = _metricCardsFrom(report, meta);
-
-    final issues = report.issues
+    final problems = report.issues
         .map(
-          (issue) => IssueView(
-            title: issue.title,
-            detail: issue.description,
-            severity: issue.severity.name,
+          (issue) => ProblemView(
+            title: _friendlyIssueTitle(issue),
+            detail: HumanMessage.fromProbeError(
+              issue.description,
+              fallback: 'Something on this network path isn’t responding well.',
+            ),
+            severity: HumanMessage.severityLabel(issue.severity.name),
             tone: _toneForSeverity(issue.severity),
             icon: _iconForIssue(issue.code ?? issue.id),
+            technicalDetail: issue.description,
           ),
         )
         .toList(growable: false);
 
-    final recommendations = report.recommendations
-        .map(
-          (item) => RecommendationView(
-            title: item.title,
-            detail: item.detail,
-            icon: _iconForRecommendation(item.id),
-          ),
-        )
-        .toList(growable: false);
-
-    final recommendedFixes = fixProvider == null
-        ? const <RecommendedFixView>[]
-        : recommendedFixesFor(report: report, fixProvider: fixProvider);
+    final fixes = fixProvider == null
+        ? (primary: null, secondary: const <RecommendedFixView>[])
+        : selectRecommendedFixes(report: report, fixProvider: fixProvider);
 
     return DiagnosticsResultViewData(
       overallScore: report.health.score,
-      scoreLabel: report.health.label,
-      scoreSummary: summary,
+      scoreLabel: _friendlyScoreLabel(report.health.label, report.health.score),
+      scoreSummary: report.health.summary ?? summary,
       scoreTone: scoreTone,
       confidence: report.confidence,
       timestampLabel: timestamp,
-      latencyBars: latencyBars,
-      stabilityTrend: trend,
-      metricCards: cards,
-      issues: issues,
-      recommendations: recommendations,
-      recommendedFixes: recommendedFixes,
+      networkMetrics: _networkMetricsFrom(meta),
+      problems: problems,
+      serviceImpacts: _serviceImpactsFrom(report),
+      technicalDetails: _technicalDetailsFrom(report, meta),
+      primaryFix: fixes.primary,
+      secondaryFixes: fixes.secondary,
     );
   }
 
-  /// Maps host [FixAction]s whose related issue codes appear in [report].
-  static List<RecommendedFixView> recommendedFixesFor({
+  /// One primary actionable fix + optional secondary actions.
+  /// Never returns contradictory IPv6 enable/disable together.
+  static ({RecommendedFixView? primary, List<RecommendedFixView> secondary})
+      selectRecommendedFixes({
     required DiagnosticReport report,
     required FixProvider fixProvider,
   }) {
@@ -116,51 +110,103 @@ final class DiagnosticsResultViewData {
         if (issue.code != null) issue.code!,
       ],
     };
+    if (issueCodes.isEmpty) {
+      return (primary: null, secondary: const []);
+    }
 
-    if (issueCodes.isEmpty) return const [];
+    final hasLatency = issueCodes.contains('ipv6_latency');
+    final hasUnavailable = issueCodes.contains('ipv6_unavailable');
 
-    final views = <RecommendedFixView>[];
+    final candidates = <RecommendedFixView>[];
     for (final action in fixProvider.availableActions()) {
       if (action.availability == FixAvailability.unsupported) continue;
+      if (action.relatedIssueCodes.isEmpty) continue;
       if (!action.relatedIssueCodes.any(issueCodes.contains)) continue;
+
+      // Contradiction guard.
+      if (hasLatency && action.kind == FixActionKind.enableIpv6) continue;
+      if (!hasLatency &&
+          hasUnavailable &&
+          action.kind == FixActionKind.disableIpv6) {
+        continue;
+      }
+      if (hasLatency &&
+          hasUnavailable &&
+          action.kind == FixActionKind.enableIpv6) {
+        continue;
+      }
 
       final relatedIssues = report.issues
           .where(
-            (issue) => action.relatedIssueCodes.contains(issue.code ?? issue.id),
+            (issue) =>
+                action.relatedIssueCodes.contains(issue.code ?? issue.id),
           )
           .toList(growable: false);
+      if (relatedIssues.isEmpty) continue;
 
-      views.add(
-        RecommendedFixView(
-          id: action.id,
-          kind: action.kind,
-          title: action.title,
-          description: action.description,
-          why: _whyFor(
-            action: action,
-            report: report,
-            relatedIssues: relatedIssues,
-          ),
-          confidenceLabel: _confidenceLabel(
-            report: report,
-            relatedIssues: relatedIssues,
-          ),
-          estimatedImprovement: _estimatedImprovement(
-            action: action,
-            report: report,
-            relatedIssues: relatedIssues,
-          ),
-          availabilityLabel: _availabilityLabel(action.availability),
-          availabilityTone: _availabilityTone(action.availability),
-          icon: _iconForFix(action.kind),
-          canConfirmApply: action.availability == FixAvailability.available ||
-              action.availability == FixAvailability.requiresElevation,
-          requiresElevation:
-              action.availability == FixAvailability.requiresElevation,
+      candidates.add(
+        _buildFixView(
+          action: action,
+          report: report,
+          relatedIssues: relatedIssues,
         ),
       );
     }
-    return List.unmodifiable(views);
+
+    if (candidates.isEmpty) {
+      return (primary: null, secondary: const []);
+    }
+
+    candidates.sort((a, b) {
+      final applyCmp = (b.canConfirmApply ? 1 : 0) - (a.canConfirmApply ? 1 : 0);
+      if (applyCmp != 0) return applyCmp;
+      return b.priorityScore.compareTo(a.priorityScore);
+    });
+
+    return (
+      primary: candidates.first,
+      secondary: List.unmodifiable(candidates.skip(1)),
+    );
+  }
+
+  static RecommendedFixView _buildFixView({
+    required FixAction action,
+    required DiagnosticReport report,
+    required List<DiagnosticIssue> relatedIssues,
+  }) {
+    final improvement = _estimatedImprovement(
+      action: action,
+      report: report,
+      relatedIssues: relatedIssues,
+    );
+    return RecommendedFixView(
+      id: action.id,
+      kind: action.kind,
+      title: action.title,
+      description: action.description,
+      why: _whyFor(action: action, report: report, relatedIssues: relatedIssues),
+      whyThisRecommendation: _whyThisRecommendation(
+        action: action,
+        report: report,
+        relatedIssues: relatedIssues,
+      ),
+      confidenceLabel: _confidenceLabel(
+        report: report,
+        relatedIssues: relatedIssues,
+      ),
+      estimatedImprovement: improvement,
+      serviceImpacts: _fixServiceImpacts(action.kind, improvement),
+      availabilityLabel: _availabilityLabel(action.availability),
+      availabilityTone: _availabilityTone(action.availability),
+      icon: _iconForFix(action.kind),
+      canConfirmApply: action.availability == FixAvailability.available ||
+          action.availability == FixAvailability.requiresElevation,
+      requiresElevation:
+          action.availability == FixAvailability.requiresElevation,
+      priorityScore: _priorityScore(relatedIssues, action),
+      backedByRuleIds:
+          relatedIssues.map((issue) => issue.code ?? issue.id).toList(),
+    );
   }
 
   static String _whyFor({
@@ -173,20 +219,37 @@ final class DiagnosticsResultViewData {
       final ipv6Ms = double.tryParse(report.metadata['ipv6_latency_ms'] ?? '');
       if (ipv4Ms != null && ipv6Ms != null && ipv4Ms > 0 && ipv6Ms > ipv4Ms) {
         final ratio = ipv6Ms / ipv4Ms;
-        final formatted = ratio >= 10
+        final formatted = ratio >= 2
             ? ratio.round().toString()
-            : (ratio >= 2
-                ? ratio.round().toString()
-                : ratio.toStringAsFixed(1));
-        return 'Your IPv6 latency is $formatted× higher than IPv4.';
+            : ratio.toStringAsFixed(1);
+        return 'IPv6 is responding about $formatted× slower than IPv4 right now.';
       }
     }
 
     if (relatedIssues.isNotEmpty) {
-      return relatedIssues.first.description;
+      return HumanMessage.fromProbeError(
+        relatedIssues.first.description,
+        fallback: action.description,
+      );
     }
-
     return action.description;
+  }
+
+  static String _whyThisRecommendation({
+    required FixAction action,
+    required DiagnosticReport report,
+    required List<DiagnosticIssue> relatedIssues,
+  }) {
+    return switch (action.kind) {
+      FixActionKind.disableIpv6 =>
+        'Preferring IPv4 can help apps skip a slow IPv6 path and feel snappier for tools that use the network.',
+      FixActionKind.enableIpv6 =>
+        'Turning IPv6 back on can restore normal dual-stack routing when something disabled it earlier.',
+      FixActionKind.flushDns =>
+        'Clearing outdated DNS answers can help when names resolve incorrectly after network changes.',
+      FixActionKind.openWarp =>
+        'A quieter edge path can help when public routes are congested or unreliable.',
+    };
   }
 
   static String _confidenceLabel({
@@ -195,10 +258,12 @@ final class DiagnosticsResultViewData {
   }) {
     var confidence = report.confidence;
     for (final issue in relatedIssues) {
-      final parsed = double.tryParse(issue.metadata['rule_confidence'] ?? '');
-      if (parsed != null && parsed > confidence) {
-        confidence = parsed;
-      }
+      final parsed = double.tryParse(
+        issue.metadata['rule_confidence'] ??
+            issue.metadata['confidence_confidence'] ??
+            '',
+      );
+      if (parsed != null && parsed > confidence) confidence = parsed;
     }
     return '${(confidence * 100).round()}%';
   }
@@ -230,12 +295,271 @@ final class DiagnosticsResultViewData {
     };
   }
 
+  static List<ServiceImpactView> _fixServiceImpacts(
+    FixActionKind kind,
+    String improvement,
+  ) {
+    final focus = switch (kind) {
+      FixActionKind.disableIpv6 || FixActionKind.enableIpv6 => {
+          'Git': improvement,
+          'Python': improvement,
+          'Docker': 'Medium',
+          'AI APIs': improvement,
+        },
+      FixActionKind.flushDns => {
+          'Git': 'Medium',
+          'Python': 'Medium',
+          'Docker': 'High',
+          'AI APIs': 'Medium',
+        },
+      FixActionKind.openWarp => {
+          'Git': 'Medium',
+          'Python': 'Low',
+          'Docker': 'Medium',
+          'AI APIs': 'High',
+        },
+    };
+
+    return [
+      for (final entry in focus.entries)
+        ServiceImpactView(
+          name: entry.key,
+          level: entry.value,
+          label: HumanMessage.impactLabel(entry.value),
+          icon: _iconForService(entry.key),
+        ),
+    ];
+  }
+
+  static List<ServiceImpactView> _serviceImpactsFrom(DiagnosticReport report) {
+    final codes = {
+      for (final issue in report.issues) issue.code ?? issue.id,
+    };
+
+    String levelFor({
+      required bool hit,
+      required String strong,
+    }) {
+      if (!hit) return 'None';
+      return strong;
+    }
+
+    final git = levelFor(
+      hit: codes.any((c) =>
+          c.contains('github') || c.contains('ipv6') || c.contains('dns')),
+      strong: codes.any((c) => c.contains('github')) ? 'High' : 'Medium',
+    );
+    final python = levelFor(
+      hit: codes.any(
+          (c) => c.contains('pypi') || c.contains('ipv6') || c.contains('dns')),
+      strong: codes.any((c) => c.contains('pypi')) ? 'High' : 'Medium',
+    );
+    final docker = levelFor(
+      hit: codes.any((c) => c.contains('dns') || c.contains('ipv6')),
+      strong: codes.any((c) => c.contains('dns')) ? 'High' : 'Medium',
+    );
+    final ai = levelFor(
+      hit: codes.any((c) =>
+          c.contains('ipv6') || c.contains('dns') || c.contains('github')),
+      strong: 'Medium',
+    );
+
+    return [
+      ServiceImpactView(
+        name: 'Git',
+        level: git,
+        label: HumanMessage.impactLabel(git),
+        icon: _iconForService('Git'),
+      ),
+      ServiceImpactView(
+        name: 'Python',
+        level: python,
+        label: HumanMessage.impactLabel(python),
+        icon: _iconForService('Python'),
+      ),
+      ServiceImpactView(
+        name: 'Docker',
+        level: docker,
+        label: HumanMessage.impactLabel(docker),
+        icon: _iconForService('Docker'),
+      ),
+      ServiceImpactView(
+        name: 'AI APIs',
+        level: ai,
+        label: HumanMessage.impactLabel(ai),
+        icon: _iconForService('AI APIs'),
+      ),
+    ];
+  }
+
+  static List<NetworkMetricView> _networkMetricsFrom(Map<String, String> meta) {
+    final metrics = <NetworkMetricView>[];
+
+    final ipv4Ok = meta['ipv4_success'] == 'true';
+    final ipv4Ms = meta['ipv4_latency_ms'];
+    metrics.add(
+      NetworkMetricView(
+        title: 'IPv4',
+        value: ipv4Ok
+            ? (ipv4Ms != null ? '$ipv4Ms ms' : 'Reachable')
+            : 'Unavailable',
+        detail: ipv4Ok
+            ? 'Working path for most tools'
+            : HumanMessage.fromProbeError(
+                meta['ipv4_error'],
+                fallback: 'Couldn’t complete an IPv4 check',
+              ),
+        tone: ipv4Ok ? StatusBadgeTone.success : StatusBadgeTone.error,
+        icon: Icons.public_rounded,
+        technicalDetail: [
+          if (meta['ipv4_address'] != null) 'Address: ${meta['ipv4_address']}',
+          if (meta['ipv4_error'] != null) meta['ipv4_error']!,
+        ].join('\n'),
+      ),
+    );
+
+    final ipv6Ok = meta['ipv6_success'] == 'true';
+    final ipv6Ms = meta['ipv6_latency_ms'];
+    if (meta.containsKey('ipv6_success') || ipv6Ms != null) {
+      metrics.add(
+        NetworkMetricView(
+          title: 'IPv6',
+          value: ipv6Ok
+              ? (ipv6Ms != null ? '$ipv6Ms ms' : 'Reachable')
+              : 'Unavailable',
+          detail: ipv6Ok
+              ? 'Secondary path used by some services'
+              : HumanMessage.fromProbeError(
+                  meta['ipv6_error'],
+                  fallback: 'Couldn’t complete an IPv6 check',
+                ),
+          tone: ipv6Ok
+              ? (ipv6Ms != null &&
+                      ipv4Ms != null &&
+                      (double.tryParse(ipv6Ms) ?? 0) >
+                          (double.tryParse(ipv4Ms) ?? 0) * 2
+                  ? StatusBadgeTone.warning
+                  : StatusBadgeTone.success)
+              : StatusBadgeTone.warning,
+          icon: Icons.hub_outlined,
+          technicalDetail: [
+            if (meta['ipv6_address'] != null)
+              'Address: ${meta['ipv6_address']}',
+            if (meta['ipv6_error'] != null) meta['ipv6_error']!,
+          ].join('\n'),
+        ),
+      );
+    }
+
+    final cfOk = meta['cloudflare_success'] != 'false';
+    if (meta.containsKey('cloudflare_success') ||
+        meta.containsKey('cloudflare_latency_ms')) {
+      final cfMs = meta['cloudflare_latency_ms'];
+      metrics.add(
+        NetworkMetricView(
+          title: 'Internet edge',
+          value: cfOk
+              ? (cfMs != null ? '$cfMs ms' : 'Reachable')
+              : 'Unavailable',
+          detail: cfOk
+              ? 'General internet path check'
+              : HumanMessage.fromProbeError(
+                  meta['cloudflare_error'],
+                  fallback: 'Edge check didn’t complete',
+                ),
+          tone: cfOk ? StatusBadgeTone.success : StatusBadgeTone.warning,
+          icon: Icons.cloud_outlined,
+          technicalDetail: [
+            if (meta['cloudflare_http_status'] != null)
+              'HTTP ${meta['cloudflare_http_status']}',
+            if (meta['cloudflare_error'] != null) meta['cloudflare_error']!,
+          ].join('\n'),
+        ),
+      );
+    }
+
+    return metrics;
+  }
+
+  static List<TechnicalDetailView> _technicalDetailsFrom(
+    DiagnosticReport report,
+    Map<String, String> meta,
+  ) {
+    final rows = <TechnicalDetailView>[
+      TechnicalDetailView(
+        label: 'Report ID',
+        value: report.id,
+      ),
+      TechnicalDetailView(
+        label: 'Checked at',
+        value: report.createdAt.toUtc().toIso8601String(),
+      ),
+      if (report.duration != null)
+        TechnicalDetailView(
+          label: 'Duration',
+          value: '${report.duration!.inMilliseconds} ms',
+        ),
+      for (final issue in report.issues)
+        TechnicalDetailView(
+          label: 'Rule ${issue.code ?? issue.id}',
+          value: [
+            issue.title,
+            issue.description,
+            if (issue.metadata['rule_confidence'] != null)
+              'confidence=${issue.metadata['rule_confidence']}'
+            else if (issue.metadata['confidence_confidence'] != null)
+              'confidence=${issue.metadata['confidence_confidence']}',
+          ].join(' · '),
+        ),
+      for (final entry in meta.entries)
+        if (entry.key.contains('error') ||
+            entry.key.contains('latency') ||
+            entry.key.contains('address') ||
+            entry.key.contains('status') ||
+            entry.key.startsWith('rules_'))
+          TechnicalDetailView(label: entry.key, value: entry.value),
+    ];
+    return rows;
+  }
+
+  static int _priorityScore(
+    List<DiagnosticIssue> relatedIssues,
+    FixAction action,
+  ) {
+    var score = 0;
+    for (final issue in relatedIssues) {
+      score += (issue.severity.index + 1) * 10;
+    }
+    if (action.availability == FixAvailability.available ||
+        action.availability == FixAvailability.requiresElevation) {
+      score += 20;
+    }
+    return score;
+  }
+
+  static String _friendlyIssueTitle(DiagnosticIssue issue) {
+    final code = issue.code ?? issue.id;
+    if (code.contains('ipv6_latency')) return 'IPv6 is slower than expected';
+    if (code.contains('ipv6_unavailable')) return 'IPv6 isn’t available';
+    if (code.contains('dns')) return 'Name lookup is having trouble';
+    if (code.contains('github')) return 'GitHub is hard to reach';
+    if (code.contains('pypi')) return 'Python packages may download slowly';
+    return issue.title;
+  }
+
+  static String _friendlyScoreLabel(String label, int score) {
+    if (score >= 85) return 'Looking good';
+    if (score >= 70) return 'Mostly fine';
+    if (score >= 55) return 'Needs attention';
+    return 'Needs help';
+  }
+
   static String _availabilityLabel(FixAvailability availability) {
     return switch (availability) {
       FixAvailability.available => 'Ready',
-      FixAvailability.requiresElevation => 'Needs admin',
+      FixAvailability.requiresElevation => 'Needs permission',
       FixAvailability.comingSoon => 'Coming soon',
-      FixAvailability.unsupported => 'Unsupported',
+      FixAvailability.unsupported => 'Unavailable here',
     };
   }
 
@@ -257,185 +581,14 @@ final class DiagnosticsResultViewData {
     };
   }
 
-  static List<LatencyBarView> _latencyBarsFrom(Map<String, String> meta) {
-    final bars = <LatencyBarView>[];
-
-    final ipv4Ms = double.tryParse(meta['ipv4_latency_ms'] ?? '');
-    if (ipv4Ms != null) {
-      bars.add(
-        LatencyBarView(
-          label: 'IPv4',
-          ms: ipv4Ms,
-          tone: meta['ipv4_success'] == 'true'
-              ? StatusBadgeTone.success
-              : StatusBadgeTone.warning,
-        ),
-      );
-    }
-
-    final cfMs = double.tryParse(meta['cloudflare_latency_ms'] ?? '');
-    if (cfMs != null) {
-      bars.add(
-        LatencyBarView(
-          label: 'CF',
-          ms: cfMs,
-          tone: meta['cloudflare_success'] == 'true'
-              ? StatusBadgeTone.success
-              : StatusBadgeTone.warning,
-        ),
-      );
-    }
-
-    // Stable placeholders derived from available metrics when sparse.
-    if (bars.isEmpty) {
-      final rulesFailed = double.tryParse(meta['rules_failed'] ?? '0') ?? 0;
-      bars.addAll([
-        LatencyBarView(
-          label: 'DNS',
-          ms: rulesFailed > 0 ? 80 : 24,
-          tone: rulesFailed > 0 ? StatusBadgeTone.warning : StatusBadgeTone.success,
-        ),
-        const LatencyBarView(
-          label: 'Path',
-          ms: 36,
-          tone: StatusBadgeTone.info,
-        ),
-      ]);
-    }
-
-    return bars;
-  }
-
-  static List<double> _trendFrom(
-    DiagnosticReport report,
-    List<LatencyBarView> bars,
-  ) {
-    if (bars.isNotEmpty) {
-      return [
-        for (var i = 0; i < 8; i++)
-          bars[i % bars.length].ms * (0.7 + (i * 0.05)),
-      ];
-    }
-    final score = report.health.score.toDouble();
-    return [
-      score * 0.4,
-      score * 0.45,
-      score * 0.42,
-      score * 0.5,
-      score * 0.48,
-      score * 0.55,
-      score * 0.52,
-      score * 0.58,
-    ];
-  }
-
-  static List<MetricCardView> _metricCardsFrom(
-    DiagnosticReport report,
-    Map<String, String> meta,
-  ) {
-    final cards = <MetricCardView>[];
-
-    cards.add(
-      MetricCardView(
-        title: 'Confidence',
-        value: '${(report.confidence * 100).round()}%',
-        detail: 'Aggregate rule confidence',
-        tone: report.confidence >= 0.75
-            ? StatusBadgeTone.success
-            : StatusBadgeTone.warning,
-        icon: Icons.insights_outlined,
-        spark: [
-          report.confidence * 40,
-          report.confidence * 55,
-          report.confidence * 50,
-          report.confidence * 70,
-          report.confidence * 65,
-          report.confidence * 80,
-          report.confidence * 90,
-          report.confidence * 100,
-        ],
-      ),
-    );
-
-    final ipv4Ok = meta['ipv4_success'] == 'true';
-    cards.add(
-      MetricCardView(
-        title: 'IPv4',
-        value: ipv4Ok ? (meta['ipv4_latency_ms'] != null ? '${meta['ipv4_latency_ms']} ms' : 'OK') : 'Fail',
-        detail: ipv4Ok
-            ? (meta['ipv4_address'] ?? 'Reachable')
-            : (meta['ipv4_error'] ?? 'Unavailable'),
-        tone: ipv4Ok ? StatusBadgeTone.success : StatusBadgeTone.error,
-        icon: Icons.filter_1_rounded,
-        spark: ipv4Ok ? const [8, 9, 8, 7, 9, 8, 8, 7] : const [4, 3, 2, 1, 2, 1, 0, 0],
-      ),
-    );
-
-    final cfOk = meta['cloudflare_success'] != 'false';
-    final cfStatus = meta['cloudflare_http_status'];
-    cards.add(
-      MetricCardView(
-        title: 'Cloudflare',
-        value: cfStatus != null ? 'HTTP $cfStatus' : (cfOk ? 'OK' : 'Fail'),
-        detail: meta['cloudflare_latency_ms'] != null
-            ? '${meta['cloudflare_latency_ms']} ms edge'
-            : (meta['cloudflare_error'] ?? 'Edge probe'),
-        tone: cfOk ? StatusBadgeTone.success : StatusBadgeTone.warning,
-        icon: Icons.cloud_outlined,
-        spark: const [16, 17, 15, 18, 16, 19, 17, 18],
-      ),
-    );
-
-    for (final entry in report.health.metrics.entries.take(3)) {
-      cards.add(
-        MetricCardView(
-          title: _titleCase(entry.key),
-          value: entry.value == entry.value.roundToDouble()
-              ? '${entry.value.round()}'
-              : entry.value.toStringAsFixed(1),
-          detail: 'Network metric',
-          tone: StatusBadgeTone.info,
-          icon: Icons.speed_outlined,
-          spark: [
-            entry.value * 0.6,
-            entry.value * 0.7,
-            entry.value * 0.65,
-            entry.value * 0.8,
-            entry.value * 0.75,
-            entry.value * 0.9,
-            entry.value * 0.85,
-            entry.value,
-          ],
-        ),
-      );
-    }
-
-    final rulesFailed = meta['rules_failed'];
-    if (rulesFailed != null) {
-      final failed = int.tryParse(rulesFailed) ?? 0;
-      cards.add(
-        MetricCardView(
-          title: 'Rules',
-          value: '$failed failed',
-          detail: '${meta['rules_evaluated'] ?? '—'} evaluated',
-          tone: failed == 0 ? StatusBadgeTone.success : StatusBadgeTone.warning,
-          icon: Icons.rule_folder_outlined,
-          spark: failed == 0
-              ? const [1, 1, 1, 1, 1, 1, 1, 1]
-              : const [1, 2, 2, 3, 3, 4, 4, 5],
-        ),
-      );
-    }
-
-    return cards;
-  }
-
-  static String _titleCase(String key) {
-    return key
-        .split('_')
-        .where((part) => part.isNotEmpty)
-        .map((part) => '${part[0].toUpperCase()}${part.substring(1)}')
-        .join(' ');
+  static IconData _iconForService(String name) {
+    return switch (name) {
+      'Git' => Icons.merge_type_rounded,
+      'Python' => Icons.terminal_rounded,
+      'Docker' => Icons.inventory_2_outlined,
+      'AI APIs' => Icons.auto_awesome_outlined,
+      _ => Icons.apps_rounded,
+    };
   }
 
   static StatusBadgeTone _toneForScore(int score) {
@@ -456,41 +609,21 @@ final class DiagnosticsResultViewData {
 
   static IconData _iconForIssue(String code) {
     if (code.contains('dns')) return Icons.dns_outlined;
-    if (code.contains('ipv6')) return Icons.link_off_rounded;
-    if (code.contains('github')) return Icons.south_east_rounded;
-    if (code.contains('pypi')) return Icons.inventory_2_outlined;
-    return Icons.warning_amber_rounded;
-  }
-
-  static IconData _iconForRecommendation(String id) {
-    if (id.contains('ipv6')) return Icons.settings_ethernet_rounded;
-    if (id.contains('github')) return Icons.bolt_outlined;
-    if (id.contains('dns')) return Icons.verified_outlined;
-    if (id.contains('pypi')) return Icons.inventory_2_outlined;
-    return Icons.lightbulb_outline_rounded;
+    if (code.contains('ipv6')) return Icons.settings_ethernet_rounded;
+    if (code.contains('github')) return Icons.merge_type_rounded;
+    if (code.contains('pypi')) return Icons.terminal_rounded;
+    return Icons.info_outline_rounded;
   }
 }
 
-class LatencyBarView {
-  const LatencyBarView({
-    required this.label,
-    required this.ms,
-    required this.tone,
-  });
-
-  final String label;
-  final double ms;
-  final StatusBadgeTone tone;
-}
-
-class MetricCardView {
-  const MetricCardView({
+class NetworkMetricView {
+  const NetworkMetricView({
     required this.title,
     required this.value,
     required this.detail,
     required this.tone,
     required this.icon,
-    required this.spark,
+    this.technicalDetail = '',
   });
 
   final String title;
@@ -498,16 +631,17 @@ class MetricCardView {
   final String detail;
   final StatusBadgeTone tone;
   final IconData icon;
-  final List<double> spark;
+  final String technicalDetail;
 }
 
-class IssueView {
-  const IssueView({
+class ProblemView {
+  const ProblemView({
     required this.title,
     required this.detail,
     required this.severity,
     required this.tone,
     required this.icon,
+    this.technicalDetail = '',
   });
 
   final String title;
@@ -515,21 +649,33 @@ class IssueView {
   final String severity;
   final StatusBadgeTone tone;
   final IconData icon;
+  final String technicalDetail;
 }
 
-class RecommendationView {
-  const RecommendationView({
-    required this.title,
-    required this.detail,
+class ServiceImpactView {
+  const ServiceImpactView({
+    required this.name,
+    required this.level,
+    required this.label,
     required this.icon,
   });
 
-  final String title;
-  final String detail;
+  final String name;
+  final String level;
+  final String label;
   final IconData icon;
 }
 
-/// Presentation model for an Auto Fix suggestion on the results screen.
+class TechnicalDetailView {
+  const TechnicalDetailView({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+}
+
 class RecommendedFixView {
   const RecommendedFixView({
     required this.id,
@@ -537,11 +683,15 @@ class RecommendedFixView {
     required this.title,
     required this.description,
     required this.why,
+    required this.whyThisRecommendation,
     required this.confidenceLabel,
     required this.estimatedImprovement,
+    required this.serviceImpacts,
     required this.availabilityLabel,
     required this.availabilityTone,
     required this.icon,
+    required this.priorityScore,
+    required this.backedByRuleIds,
     this.canConfirmApply = false,
     this.requiresElevation = false,
   });
@@ -550,23 +700,16 @@ class RecommendedFixView {
   final FixActionKind kind;
   final String title;
   final String description;
-
-  /// Evidence-backed explanation shown under "Why?".
   final String why;
-
-  /// Display confidence, e.g. `96%`.
+  final String whyThisRecommendation;
   final String confidenceLabel;
-
-  /// Expected impact label: High / Medium / Low.
   final String estimatedImprovement;
-
+  final List<ServiceImpactView> serviceImpacts;
   final String availabilityLabel;
   final StatusBadgeTone availabilityTone;
   final IconData icon;
-
-  /// Whether the Apply Fix confirmation flow can be opened.
+  final int priorityScore;
+  final List<String> backedByRuleIds;
   final bool canConfirmApply;
-
-  /// Whether confirming later will typically need elevation.
   final bool requiresElevation;
 }

@@ -156,8 +156,7 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
               ],
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Confirming will ask the platform Auto Fix provider to apply '
-                'this change on your device.',
+                        'Confirming will ask RouteFix to apply this change on your device.',
                 style: text.bodySmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                   height: 1.4,

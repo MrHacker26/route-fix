@@ -25,9 +25,11 @@ final class Ipv6UnavailableRule
       confidence: 0.95,
       recommendation: Recommendation(
         id: 'ipv6-unavailable',
-        title: 'IPv6 is unavailable',
-        detail: input.error ??
-            'No usable IPv6 route or address was observed for this host.',
+        title: 'IPv6 isn’t available',
+        detail: input.error == null || input.error!.trim().isEmpty
+            ? 'This device couldn’t use an IPv6 path for the check. '
+                'Some services may fall back to IPv4 or feel inconsistent.'
+            : input.error!,
         priority: DiagnosticSeverity.low,
       ),
     );

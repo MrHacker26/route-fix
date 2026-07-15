@@ -33,10 +33,11 @@ final class Ipv6LatencyRule
       confidence: 0.9,
       recommendation: Recommendation(
         id: 'ipv6-latency-high',
-        title: 'IPv6 path is slow',
+        title: 'IPv6 is slower than expected',
         detail:
-            'IPv6 connected but latency (${input.latency!.inMilliseconds} ms) '
-            'exceeded ${threshold.inMilliseconds} ms.',
+            'IPv6 connected, but responses took about '
+            '${input.latency!.inMilliseconds} ms. That can make some tools '
+            'feel sluggish even when IPv4 is fine.',
         priority: DiagnosticSeverity.medium,
       ),
     );

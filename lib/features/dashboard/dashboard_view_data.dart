@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../design_system/design_system.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import '../../domain/models/diagnostics/diagnostic_severity.dart';
+import '../diagnostics/human_message.dart';
 
 /// Presentation model for the dashboard — mapped from [DiagnosticReport].
 final class DashboardViewData {
@@ -37,17 +38,20 @@ final class DashboardViewData {
     final cloudflareStatus = meta['cloudflare_http_status'] ?? '—';
 
     final connection = ConnectionStatusView(
-      title: ipv4Ok ? 'Connected' : 'Connectivity issues',
+      title: ipv4Ok ? 'Connected' : 'Connection needs a look',
       subtitle: ipv4Ok
-          ? 'IPv4 reachable · $hostname'
-          : (meta['ipv4_error'] ?? 'Unable to confirm local path'),
+          ? 'Reachable · $hostname'
+          : HumanMessage.fromProbeError(
+              meta['ipv4_error'],
+              fallback: 'Couldn’t confirm a clear IPv4 path',
+            ),
       tone: ipv4Ok ? StatusBadgeTone.success : StatusBadgeTone.warning,
       badgeLabel: ipv4Ok ? 'Online' : 'Degraded',
       details: [
         ConnectionDetailView(label: 'Target', value: hostname),
         ConnectionDetailView(label: 'IPv4', value: ipv4Address),
         ConnectionDetailView(
-          label: 'CF HTTP',
+          label: 'Edge status',
           value: cloudflareStatus,
         ),
       ],
@@ -57,25 +61,24 @@ final class DashboardViewData {
     if (report.issues.isEmpty) {
       summary.addAll([
         const SummaryItemView(
-          title: 'DNS & routing',
-          detail: 'No diagnosis rules failed on this run',
+          title: 'Routing',
+          detail: 'No route problems showed up in this check',
           tone: StatusBadgeTone.success,
           badge: 'Healthy',
           icon: Icons.verified_outlined,
         ),
         SummaryItemView(
           title: 'Confidence',
-          detail:
-              '${(report.confidence * 100).round()}% aggregate rule confidence',
+          detail: '${(report.confidence * 100).round()}% sure about this reading',
           tone: StatusBadgeTone.info,
           badge: 'Stable',
           icon: Icons.insights_outlined,
         ),
         SummaryItemView(
-          title: 'Cloudflare edge',
+          title: 'Internet path',
           detail: ipv4Latency == null
-              ? 'Edge probe completed'
-              : 'IPv4 probe $ipv4Latency ms · CF status $cloudflareStatus',
+              ? 'Edge check completed'
+              : 'About $ipv4Latency ms · status $cloudflareStatus',
           tone: StatusBadgeTone.success,
           badge: 'OK',
           icon: Icons.cloud_outlined,
@@ -86,9 +89,12 @@ final class DashboardViewData {
         summary.add(
           SummaryItemView(
             title: issue.title,
-            detail: issue.description,
+            detail: HumanMessage.fromProbeError(
+              issue.description,
+              fallback: 'Something on this path needs attention',
+            ),
             tone: _toneForSeverity(issue.severity),
-            badge: issue.severity.name,
+            badge: HumanMessage.severityLabel(issue.severity.name),
             icon: _iconForIssue(issue.code ?? issue.id),
           ),
         );
@@ -96,7 +102,7 @@ final class DashboardViewData {
     }
 
     final finding = report.issues.isEmpty
-        ? 'All clear · ${report.health.label}'
+        ? 'Looking calm · ${report.health.label}'
         : report.issues.first.title;
 
     final created = report.createdAt.toLocal();

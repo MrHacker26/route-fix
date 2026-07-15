@@ -5,6 +5,7 @@ import '../../domain/autofix/fix_provider.dart';
 import '../../domain/autofix/models/fix_result.dart';
 import 'apply_fix_confirmation_dialog.dart';
 import 'diagnostics_result_view_data.dart';
+import 'human_message.dart';
 
 enum _ApplyPhase { idle, loading, success, failure }
 
@@ -15,11 +16,13 @@ class RecommendedFixCard extends StatefulWidget {
     required this.fix,
     required this.fixProvider,
     this.onRerunDiagnostics,
+    this.compact = false,
   });
 
   final RecommendedFixView fix;
   final FixProvider fixProvider;
   final VoidCallback? onRerunDiagnostics;
+  final bool compact;
 
   @override
   State<RecommendedFixCard> createState() => _RecommendedFixCardState();
@@ -28,6 +31,7 @@ class RecommendedFixCard extends StatefulWidget {
 class _RecommendedFixCardState extends State<RecommendedFixCard> {
   _ApplyPhase _phase = _ApplyPhase.idle;
   String? _failureMessage;
+  String? _failureTechnical;
 
   Future<void> _handleApply() async {
     if (_phase == _ApplyPhase.loading) return;
@@ -39,6 +43,7 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
     setState(() {
       _phase = _ApplyPhase.loading;
       _failureMessage = null;
+      _failureTechnical = null;
     });
 
     late final FixResult result;
@@ -48,7 +53,11 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
       if (!mounted) return;
       setState(() {
         _phase = _ApplyPhase.failure;
-        _failureMessage = error.toString();
+        _failureTechnical = error.toString();
+        _failureMessage = HumanMessage.fromProbeError(
+          error.toString(),
+          fallback: 'We couldn’t apply that change just now.',
+        );
       });
       return;
     }
@@ -59,10 +68,14 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
       if (result.success) {
         _phase = _ApplyPhase.success;
         _failureMessage = null;
+        _failureTechnical = null;
       } else {
         _phase = _ApplyPhase.failure;
-        _failureMessage =
-            result.error ?? result.message ?? 'Fix failed to apply.';
+        _failureTechnical = result.error ?? result.message;
+        _failureMessage = HumanMessage.fromProbeError(
+          result.error ?? result.message,
+          fallback: 'That change didn’t go through. You can try again.',
+        );
       }
     });
   }
@@ -77,6 +90,8 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
           fix: widget.fix,
           loading: _phase == _ApplyPhase.loading,
           failureMessage: _failureMessage,
+          failureTechnical: _failureTechnical,
+          compact: widget.compact,
           onApply: _handleApply,
         ),
     };
@@ -88,12 +103,16 @@ class _RecommendationBody extends StatelessWidget {
     required this.fix,
     required this.loading,
     required this.onApply,
+    required this.compact,
     this.failureMessage,
+    this.failureTechnical,
   });
 
   final RecommendedFixView fix;
   final bool loading;
+  final bool compact;
   final String? failureMessage;
+  final String? failureTechnical;
   final VoidCallback onApply;
 
   @override
@@ -101,41 +120,79 @@ class _RecommendationBody extends StatelessWidget {
     final text = AppTypography.textTheme;
 
     return GlassCard(
+      padding: EdgeInsets.all(compact ? AppSpacing.md : AppSpacing.cardPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Recommended Action',
+            compact ? 'Possible action' : 'Recommended action',
             style: text.labelMedium?.copyWith(
               color: AppColors.onSurfaceMuted,
               letterSpacing: 0.2,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(fix.title, style: text.titleLarge),
-          const SizedBox(height: AppSpacing.lg),
-          _LabeledBlock(
-            label: 'Why?',
-            value: fix.why,
+          Text(
+            fix.title,
+            style: compact ? text.titleMedium : text.titleLarge,
           ),
           const SizedBox(height: AppSpacing.md),
-          Row(
-            children: [
-              Expanded(
-                child: _LabeledBlock(
-                  label: 'Confidence',
-                  value: fix.confidenceLabel,
+          _LabeledBlock(label: 'Why?', value: fix.why),
+          if (!compact) ...[
+            const SizedBox(height: AppSpacing.md),
+            _LabeledBlock(
+              label: 'Why this recommendation?',
+              value: fix.whyThisRecommendation,
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                Expanded(
+                  child: _LabeledBlock(
+                    label: 'Confidence',
+                    value: fix.confidenceLabel,
+                  ),
                 ),
+                const SizedBox(width: AppSpacing.md),
+                Expanded(
+                  child: _LabeledBlock(
+                    label: 'Estimated improvement',
+                    value: fix.estimatedImprovement,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.md),
+            Text(
+              'Estimated impact',
+              style: text.labelMedium?.copyWith(
+                color: AppColors.onSurfaceMuted,
               ),
-              const SizedBox(width: AppSpacing.md),
-              Expanded(
-                child: _LabeledBlock(
-                  label: 'Estimated Improvement',
-                  value: fix.estimatedImprovement,
+            ),
+            const SizedBox(height: AppSpacing.xs),
+            for (final impact in fix.serviceImpacts) ...[
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                child: Row(
+                  children: [
+                    Icon(
+                      impact.icon,
+                      size: 16,
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: AppSpacing.xs),
+                    Expanded(child: Text(impact.name, style: text.bodySmall)),
+                    Text(
+                      impact.label,
+                      style: text.labelMedium?.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
+          ],
           if (failureMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
             Text(
@@ -145,6 +202,36 @@ class _RecommendationBody extends StatelessWidget {
                 height: 1.4,
               ),
             ),
+            if (failureTechnical != null &&
+                failureTechnical!.isNotEmpty &&
+                failureTechnical != failureMessage)
+              Theme(
+                data: Theme.of(context)
+                    .copyWith(dividerColor: Colors.transparent),
+                child: Material(
+                  color: Colors.transparent,
+                  child: ExpansionTile(
+                    tilePadding: EdgeInsets.zero,
+                    title: Text(
+                      'View technical details',
+                      style:
+                          text.labelMedium?.copyWith(color: AppColors.primary),
+                    ),
+                    children: [
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: SelectableText(
+                          failureTechnical!,
+                          style: text.bodySmall?.copyWith(
+                            color: AppColors.onSurfaceMuted,
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
           ],
           const SizedBox(height: AppSpacing.lg),
           const Divider(height: 1, color: AppColors.outlineSubtle),
@@ -152,7 +239,9 @@ class _RecommendationBody extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: PrimaryButton(
-              label: loading ? 'Applying…' : 'Apply Recommended Fix',
+              label: loading
+                  ? 'Applying…'
+                  : (compact ? 'Apply' : 'Apply recommended fix'),
               icon: loading ? null : Icons.auto_fix_high_outlined,
               expanded: true,
               onPressed: (!fix.canConfirmApply || loading) ? null : onApply,
@@ -186,7 +275,7 @@ class _SuccessBody extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.xs),
               Text(
-                'Fix Applied',
+                'Fix applied',
                 style: text.titleMedium?.copyWith(color: AppColors.success),
               ),
             ],
@@ -203,7 +292,7 @@ class _SuccessBody extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: PrimaryButton(
-              label: 'Re-run Diagnostics',
+              label: 'Re-run diagnostics',
               icon: Icons.refresh_rounded,
               expanded: true,
               onPressed: onRerunDiagnostics,
@@ -227,7 +316,6 @@ class _LabeledBlock extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

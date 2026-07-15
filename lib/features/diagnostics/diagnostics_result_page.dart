@@ -8,6 +8,7 @@ import '../../di/app_services.dart';
 import '../../domain/autofix/fix_provider.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import 'diagnostics_result_view_data.dart';
+import 'human_message.dart';
 import 'recommended_fix_card.dart';
 
 /// Diagnostics result report powered by a real [DiagnosticReport].
@@ -19,9 +20,7 @@ class DiagnosticsResultPage extends StatefulWidget {
     this.onClose,
   });
 
-  /// When provided, skips loading and renders immediately.
   final DiagnosticReport? report;
-
   final DiagnosticsCoordinator? coordinator;
   final VoidCallback? onClose;
 
@@ -36,6 +35,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
   DiagnosticsResultViewData? _data;
   var _loading = true;
   String? _error;
+  String? _errorTechnical;
   var _partial = false;
 
   DiagnosticsCoordinator get _coordinator =>
@@ -46,7 +46,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
     super.initState();
     _entrance = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 880),
     )..forward();
 
     final seeded = widget.report;
@@ -72,9 +72,9 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
       _data = data;
       _loading = false;
       _error = null;
+      _errorTechnical = null;
       _partial = report.metadata['ipv4_success'] == 'false' ||
-          report.metadata['cloudflare_success'] == 'false' ||
-          (report.issues.isNotEmpty && report.recommendations.isEmpty);
+          report.metadata['cloudflare_success'] == 'false';
     });
     _entrance
       ..reset()
@@ -85,6 +85,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
     setState(() {
       _loading = true;
       _error = null;
+      _errorTechnical = null;
     });
 
     try {
@@ -95,25 +96,17 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = _friendlyError(error);
+        _errorTechnical = error.toString();
+        _error = HumanMessage.fromProbeError(
+          error.toString(),
+          fallback:
+              'We couldn’t finish this check. Give it another try in a moment.',
+        );
       });
       _entrance
         ..reset()
         ..forward();
     }
-  }
-
-  String _friendlyError(Object error) {
-    final message = error.toString();
-    if (message.contains('SocketException') ||
-        message.contains('Failed host lookup') ||
-        message.contains('Network is unreachable')) {
-      return 'Couldn’t reach the network to build results. Check connectivity and retry.';
-    }
-    if (message.contains('TimeoutException') || message.contains('timed out')) {
-      return 'The diagnostic run timed out before results were ready.';
-    }
-    return 'Unable to load diagnostic results. Please try again.';
   }
 
   void _handleClose() {
@@ -124,6 +117,23 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
     if (Navigator.of(context).canPop()) {
       Navigator.of(context).pop();
     }
+  }
+
+  List<Widget> _staggered(List<Widget> children) {
+    final widgets = <Widget>[];
+    for (var i = 0; i < children.length; i++) {
+      if (i > 0) widgets.add(const SizedBox(height: AppSpacing.xl));
+      final start = (0.04 + i * 0.07).clamp(0.0, 0.7);
+      final end = (start + 0.28).clamp(0.0, 1.0);
+      widgets.add(
+        _FadeIn(
+          animation: _entrance,
+          interval: Interval(start, end, curve: Curves.easeOutCubic),
+          child: children[i],
+        ),
+      );
+    }
+    return widgets;
   }
 
   @override
@@ -148,7 +158,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 920),
+              constraints: const BoxConstraints(maxWidth: 840),
               child: CustomScrollView(
                 physics: const BouncingScrollPhysics(),
                 slivers: [
@@ -163,7 +173,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                       delegate: SliverChildListDelegate([
                         _FadeIn(
                           animation: _entrance,
-                          interval: const Interval(0.0, 0.3),
+                          interval: const Interval(0.0, 0.28),
                           child: Row(
                             children: [
                               IconButton(
@@ -187,29 +197,28 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(
-                                      'Scan results',
-                                      style: text.headlineSmall,
-                                    ),
+                                    Text('Results', style: text.headlineSmall),
                                     Text(
                                       _loading
-                                          ? 'Gathering diagnostic report…'
+                                          ? 'Listening to your network…'
                                           : _error != null
-                                              ? 'Results unavailable'
-                                              : '${data?.timestampLabel ?? ''} · live report',
-                                      style: text.bodySmall,
+                                              ? 'Couldn’t complete this check'
+                                              : '${data?.timestampLabel ?? ''} · RouteFix',
+                                      style: text.bodySmall?.copyWith(
+                                        color: AppColors.onSurfaceVariant,
+                                      ),
                                     ),
                                   ],
                                 ),
                               ),
                               StatusBadge(
                                 label: _loading
-                                    ? 'Loading'
+                                    ? 'Checking'
                                     : _error != null
-                                        ? 'Error'
+                                        ? 'Needs retry'
                                         : _partial
                                             ? 'Partial'
-                                            : 'Live',
+                                            : 'Ready',
                                 tone: _loading
                                     ? StatusBadgeTone.info
                                     : _error != null
@@ -223,75 +232,47 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                         ),
                         const SizedBox(height: AppSpacing.xl),
                         if (_loading) ...[
-                          const _LoadingCard(label: 'Building overall score…'),
-                          const SizedBox(height: AppSpacing.lg),
-                          const _LoadingCard(label: 'Preparing network metrics…'),
-                          const SizedBox(height: AppSpacing.lg),
-                          const _LoadingCard(label: 'Summarizing findings…'),
+                          const _LoadingCard(
+                            label: 'Checking how healthy your routes feel…',
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          const _LoadingCard(
+                            label: 'Comparing everyday developer paths…',
+                          ),
+                          const SizedBox(height: AppSpacing.md),
+                          const _LoadingCard(
+                            label: 'Preparing a calm recommendation…',
+                          ),
                         ] else if (_error != null) ...[
-                          _FadeIn(
-                            animation: _entrance,
-                            interval: const Interval(0.08, 0.55),
-                            child: _ErrorCard(
-                              message: _error!,
-                              onRetry: _load,
-                            ),
+                          _ErrorCard(
+                            message: _error!,
+                            technical: _errorTechnical,
+                            onRetry: _load,
                           ),
                         ] else if (data != null) ...[
-                          _FadeIn(
-                            animation: _entrance,
-                            interval: const Interval(0.05, 0.4),
-                            child: _OverallScoreSection(data: data),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          _FadeIn(
-                            animation: _entrance,
-                            interval: const Interval(0.12, 0.5),
-                            child: _ChartsSection(data: data),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          _FadeIn(
-                            animation: _entrance,
-                            interval: const Interval(0.2, 0.58),
-                            child: _HealthCardsSection(cards: data.metricCards),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          _FadeIn(
-                            animation: _entrance,
-                            interval: const Interval(0.28, 0.66),
-                            child: _IssuesSection(issues: data.issues),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          _FadeIn(
-                            animation: _entrance,
-                            interval: const Interval(0.36, 0.75),
-                            child: _RecommendationsSection(
-                              recommendations: data.recommendations,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.lg),
-                          _FadeIn(
-                            animation: _entrance,
-                            interval: const Interval(0.42, 0.82),
-                            child: _RecommendedFixesSection(
-                              fixes: data.recommendedFixes,
+                          ..._staggered([
+                            _HealthSection(data: data),
+                            _ProblemSection(problems: data.problems),
+                            _ImpactSection(impacts: data.serviceImpacts),
+                            _RecommendationSection(
+                              primary: data.primaryFix,
+                              secondary: data.secondaryFixes,
                               fixProvider: AppServices.fixProvider,
                               onRerunDiagnostics: _loading ? null : _load,
                             ),
-                          ),
+                            _TechnicalDetailsSection(
+                              details: data.technicalDetails,
+                            ),
+                          ]),
                         ],
                         const SizedBox(height: AppSpacing.xxl),
-                        _FadeIn(
-                          animation: _entrance,
-                          interval: const Interval(0.45, 0.85),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: PrimaryButton(
-                              label: 'Done',
-                              icon: Icons.check_rounded,
-                              expanded: true,
-                              onPressed: _loading ? null : _handleClose,
-                            ),
+                        SizedBox(
+                          width: double.infinity,
+                          child: PrimaryButton(
+                            label: 'Done',
+                            icon: Icons.check_rounded,
+                            expanded: true,
+                            onPressed: _loading ? null : _handleClose,
                           ),
                         ),
                       ]),
@@ -325,10 +306,27 @@ class _FadeIn extends StatelessWidget {
       opacity: curved,
       child: SlideTransition(
         position: Tween<Offset>(
-          begin: const Offset(0, 0.035),
+          begin: const Offset(0, 0.028),
           end: Offset.zero,
         ).animate(CurvedAnimation(parent: curved, curve: Curves.easeOutCubic)),
         child: child,
+      ),
+    );
+  }
+}
+
+class _SectionEyebrow extends StatelessWidget {
+  const _SectionEyebrow(this.label);
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      label,
+      style: AppTypography.textTheme.labelMedium?.copyWith(
+        color: AppColors.onSurfaceMuted,
+        letterSpacing: 0.3,
       ),
     );
   }
@@ -345,9 +343,12 @@ class _LoadingCard extends StatelessWidget {
       child: Row(
         children: [
           const SizedBox(
-            width: 22,
-            height: 22,
-            child: CircularProgressIndicator(strokeWidth: 2.2),
+            width: 20,
+            height: 20,
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.primary,
+            ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -355,6 +356,7 @@ class _LoadingCard extends StatelessWidget {
               label,
               style: AppTypography.textTheme.bodyMedium?.copyWith(
                 color: AppColors.onSurfaceVariant,
+                height: 1.4,
               ),
             ),
           ),
@@ -368,29 +370,38 @@ class _ErrorCard extends StatelessWidget {
   const _ErrorCard({
     required this.message,
     required this.onRetry,
+    this.technical,
   });
 
   final String message;
+  final String? technical;
   final VoidCallback onRetry;
 
   @override
   Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Unable to load results', style: AppTypography.textTheme.titleMedium),
+          Text('Something got in the way', style: text.titleMedium),
           const SizedBox(height: AppSpacing.sm),
           Text(
             message,
-            style: AppTypography.textTheme.bodyMedium?.copyWith(
+            style: text.bodyMedium?.copyWith(
               color: AppColors.onSurfaceVariant,
               height: 1.5,
             ),
           ),
+          if (technical != null && technical!.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            _TechnicalExpander(details: [
+              TechnicalDetailView(label: 'raw_error', value: technical!),
+            ]),
+          ],
           const SizedBox(height: AppSpacing.lg),
           SecondaryButton(
-            label: 'Retry',
+            label: 'Try again',
             icon: Icons.refresh_rounded,
             onPressed: onRetry,
           ),
@@ -400,8 +411,8 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-class _OverallScoreSection extends StatelessWidget {
-  const _OverallScoreSection({required this.data});
+class _HealthSection extends StatelessWidget {
+  const _HealthSection({required this.data});
 
   final DiagnosticsResultViewData data;
 
@@ -416,259 +427,127 @@ class _OverallScoreSection extends StatelessWidget {
       _ => AppColors.primary,
     };
 
-    return GlassCard(
-      child: Row(
-        children: [
-          SizedBox(
-            width: 140,
-            height: 140,
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0, end: score / 100),
-              duration: const Duration(milliseconds: 1200),
-              curve: Curves.easeOutCubic,
-              builder: (context, value, _) {
-                return CustomPaint(
-                  painter: _ScoreRingPainter(progress: value),
-                  child: Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          '$score',
-                          style: text.displaySmall?.copyWith(
-                            letterSpacing: -1.4,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                        Text('overall', style: text.labelSmall),
-                      ],
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-          const SizedBox(width: AppSpacing.xl),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Text('Overall score', style: text.titleMedium),
-                    const Spacer(),
-                    StatusBadge(
-                      label: data.scoreLabel,
-                      tone: data.scoreTone,
-                    ),
-                  ],
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  data.scoreSummary,
-                  style: text.bodyMedium?.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                ClipRRect(
-                  borderRadius: AppRadius.pill,
-                  child: LinearProgressIndicator(
-                    value: score / 100,
-                    minHeight: 6,
-                    backgroundColor: AppColors.surfaceHighest,
-                    color: barColor,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  'Confidence ${(data.confidence * 100).round()}% · ${data.timestampLabel}',
-                  style: text.labelSmall,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _ChartsSection extends StatelessWidget {
-  const _ChartsSection({required this.data});
-
-  final DiagnosticsResultViewData data;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppTypography.textTheme;
-
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final wide = constraints.maxWidth >= 700;
-
-        final latencyChart = GlassCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Latency by target', style: text.titleMedium),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                data.latencyBars.isEmpty
-                    ? 'No latency samples in this report'
-                    : 'Round-trip snapshot from this run',
-                style: text.labelSmall,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              SizedBox(
-                height: 168,
-                width: double.infinity,
-                child: data.latencyBars.isEmpty
-                    ? Center(
-                        child: Text(
-                          'Metrics unavailable',
-                          style: text.bodySmall,
-                        ),
-                      )
-                    : TweenAnimationBuilder<double>(
-                        tween: Tween(begin: 0, end: 1),
-                        duration: const Duration(milliseconds: 1100),
-                        curve: Curves.easeOutCubic,
-                        builder: (context, t, _) {
-                          return CustomPaint(
-                            painter: _LatencyBarsPainter(
-                              bars: data.latencyBars,
-                              progress: t,
-                            ),
-                          );
-                        },
-                      ),
-              ),
-            ],
-          ),
-        );
-
-        final trendChart = GlassCard(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('Stability trend', style: text.titleMedium),
-              const SizedBox(height: AppSpacing.xxs),
-              Text(
-                'Composite signal from collected metrics',
-                style: text.labelSmall,
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              SizedBox(
-                height: 168,
-                width: double.infinity,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: 1),
-                  duration: const Duration(milliseconds: 1200),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, t, _) {
-                    return CustomPaint(
-                      painter: _SparklinePainter(
-                        values: data.stabilityTrend,
-                        progress: t,
-                        fill: true,
-                        color: AppColors.primary,
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-
-        if (wide) {
-          return Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(child: latencyChart),
-              const SizedBox(width: AppSpacing.lg),
-              Expanded(child: trendChart),
-            ],
-          );
-        }
-
-        return Column(
-          children: [
-            latencyChart,
-            const SizedBox(height: AppSpacing.lg),
-            trendChart,
-          ],
-        );
-      },
-    );
-  }
-}
-
-class _HealthCardsSection extends StatelessWidget {
-  const _HealthCardsSection({required this.cards});
-
-  final List<MetricCardView> cards;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppTypography.textTheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Health cards', style: text.titleMedium),
+        const _SectionEyebrow('Health'),
         const SizedBox(height: AppSpacing.sm),
-        if (cards.isEmpty)
-          GlassCard(
-            child: Text(
-              'No network metrics were captured for this run.',
-              style: text.bodyMedium?.copyWith(
-                color: AppColors.onSurfaceVariant,
-              ),
-            ),
-          )
-        else
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final width = constraints.maxWidth;
-              final crossAxisCount = width >= 820
-                  ? 3
-                  : width >= 540
-                      ? 2
-                      : 1;
-              final itemWidth =
-                  (width - (AppSpacing.sm * (crossAxisCount - 1))) /
-                      crossAxisCount;
-
-              return Wrap(
-                spacing: AppSpacing.sm,
-                runSpacing: AppSpacing.sm,
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  for (final card in cards)
-                    SizedBox(
-                      width: itemWidth,
-                      child: _HealthCard(card: card),
+                  SizedBox(
+                    width: 112,
+                    height: 112,
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0, end: score / 100),
+                      duration: const Duration(milliseconds: 960),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, _) {
+                        return CustomPaint(
+                          painter: _ScoreRingPainter(progress: value),
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '$score',
+                                  style: text.headlineMedium?.copyWith(
+                                    letterSpacing: -1.2,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures(),
+                                    ],
+                                  ),
+                                ),
+                                Text(
+                                  'health',
+                                  style: text.labelSmall?.copyWith(
+                                    color: AppColors.onSurfaceMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
                     ),
+                  ),
+                  const SizedBox(width: AppSpacing.lg),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                data.scoreLabel,
+                                style: text.titleMedium,
+                              ),
+                            ),
+                            StatusBadge(
+                              label:
+                                  '${(data.confidence * 100).round()}% sure',
+                              tone: data.scoreTone,
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        Text(
+                          data.scoreSummary,
+                          style: text.bodyMedium?.copyWith(
+                            color: AppColors.onSurfaceVariant,
+                            height: 1.5,
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.md),
+                        ClipRRect(
+                          borderRadius: AppRadius.pill,
+                          child: LinearProgressIndicator(
+                            value: score / 100,
+                            minHeight: 5,
+                            backgroundColor: AppColors.surfaceHighest,
+                            color: barColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                 ],
-              );
-            },
+              ),
+              if (data.networkMetrics.isNotEmpty) ...[
+                const SizedBox(height: AppSpacing.lg),
+                const Divider(height: 1, color: AppColors.outlineSubtle),
+                const SizedBox(height: AppSpacing.lg),
+                Text(
+                  'Network snapshot',
+                  style: text.titleSmall,
+                ),
+                const SizedBox(height: AppSpacing.sm),
+                for (var i = 0; i < data.networkMetrics.length; i++) ...[
+                  if (i > 0) const SizedBox(height: AppSpacing.sm),
+                  _MetricRow(metric: data.networkMetrics[i]),
+                ],
+              ],
+            ],
           ),
+        ),
       ],
     );
   }
 }
 
-class _HealthCard extends StatelessWidget {
-  const _HealthCard({required this.card});
+class _MetricRow extends StatelessWidget {
+  const _MetricRow({required this.metric});
 
-  final MetricCardView card;
+  final NetworkMetricView metric;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-    final accent = switch (card.tone) {
+    final accent = switch (metric.tone) {
       StatusBadgeTone.success => AppColors.success,
       StatusBadgeTone.warning => AppColors.warning,
       StatusBadgeTone.error => AppColors.error,
@@ -676,44 +555,45 @@ class _HealthCard extends StatelessWidget {
       StatusBadgeTone.neutral => AppColors.onSurfaceVariant,
     };
 
-    return GlassCard(
+    return Container(
       padding: const EdgeInsets.all(AppSpacing.md),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow.withValues(alpha: 0.55),
+        borderRadius: AppRadius.mdAll,
+        border: Border.all(color: AppColors.outlineSubtle),
+      ),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.14),
-                  borderRadius: AppRadius.smAll,
-                ),
-                child: Icon(card.icon, size: 18, color: accent),
-              ),
-              const Spacer(),
-              StatusBadge(label: card.title, tone: card.tone, showDot: false),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.md),
-          Text(
-            card.value,
-            style: text.headlineSmall?.copyWith(letterSpacing: -0.8),
-          ),
-          Text(card.detail, style: text.bodySmall),
-          const SizedBox(height: AppSpacing.md),
-          SizedBox(
+          Container(
+            width: 36,
             height: 36,
-            width: double.infinity,
-            child: CustomPaint(
-              painter: _SparklinePainter(
-                values: card.spark,
-                progress: 1,
-                fill: false,
-                color: accent,
-                strokeWidth: 2,
-              ),
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: 0.14),
+              borderRadius: AppRadius.smAll,
+            ),
+            child: Icon(metric.icon, size: 18, color: accent),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(metric.title, style: text.titleSmall),
+                Text(
+                  metric.detail,
+                  style: text.bodySmall?.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Text(
+            metric.value,
+            style: text.titleSmall?.copyWith(
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
         ],
@@ -722,81 +602,84 @@ class _HealthCard extends StatelessWidget {
   }
 }
 
-class _IssuesSection extends StatelessWidget {
-  const _IssuesSection({required this.issues});
+class _ProblemSection extends StatelessWidget {
+  const _ProblemSection({required this.problems});
 
-  final List<IssueView> issues;
+  final List<ProblemView> problems;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionEyebrow('Problem'),
+        const SizedBox(height: AppSpacing.sm),
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Detected issues', style: text.titleMedium),
-              const Spacer(),
-              StatusBadge(
-                label: issues.isEmpty ? 'None' : '${issues.length} found',
-                tone: issues.isEmpty
-                    ? StatusBadgeTone.success
-                    : StatusBadgeTone.warning,
+              Row(
+                children: [
+                  Text(
+                    problems.isEmpty ? 'Nothing standing out' : 'What we noticed',
+                    style: text.titleMedium,
+                  ),
+                  const Spacer(),
+                  StatusBadge(
+                    label: problems.isEmpty ? 'Clear' : '${problems.length}',
+                    tone: problems.isEmpty
+                        ? StatusBadgeTone.success
+                        : StatusBadgeTone.warning,
+                  ),
+                ],
               ),
+              const SizedBox(height: AppSpacing.md),
+              if (problems.isEmpty)
+                Text(
+                  'This check didn’t find a clear routing problem. That usually means everyday tools should feel fine.',
+                  style: text.bodyMedium?.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                )
+              else
+                for (var i = 0; i < problems.length; i++) ...[
+                  if (i > 0) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    const Divider(height: 1, color: AppColors.outlineSubtle),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                  _ProblemRow(problem: problems[i]),
+                ],
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          if (issues.isEmpty)
-            Text(
-              'No issues detected. This diagnostic run looks clear.',
-              style: text.bodyMedium?.copyWith(
-                color: AppColors.onSurfaceVariant,
-                height: 1.45,
-              ),
-            )
-          else
-            for (var i = 0; i < issues.length; i++) ...[
-              if (i > 0) ...[
-                const SizedBox(height: AppSpacing.sm),
-                const Divider(height: 1),
-                const SizedBox(height: AppSpacing.sm),
-              ],
-              _IssueRow(issue: issues[i]),
-            ],
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _IssueRow extends StatelessWidget {
-  const _IssueRow({required this.issue});
+class _ProblemRow extends StatelessWidget {
+  const _ProblemRow({required this.problem});
 
-  final IssueView issue;
+  final ProblemView problem;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-    final accent = switch (issue.tone) {
+    final accent = switch (problem.tone) {
+      StatusBadgeTone.success => AppColors.success,
       StatusBadgeTone.warning => AppColors.warning,
       StatusBadgeTone.error => AppColors.error,
-      _ => AppColors.primary,
+      StatusBadgeTone.info => AppColors.primary,
+      StatusBadgeTone.neutral => AppColors.onSurfaceVariant,
     };
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: accent.withValues(alpha: 0.12),
-            borderRadius: AppRadius.smAll,
-          ),
-          child: Icon(issue.icon, color: accent, size: 20),
-        ),
+        Icon(problem.icon, size: 20, color: accent),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Column(
@@ -805,19 +688,22 @@ class _IssueRow extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text(issue.title, style: text.titleSmall),
+                    child: Text(problem.title, style: text.titleSmall),
                   ),
                   StatusBadge(
-                    label: issue.severity,
-                    tone: issue.tone,
+                    label: problem.severity,
+                    tone: problem.tone,
                     showDot: false,
                   ),
                 ],
               ),
               const SizedBox(height: 4),
               Text(
-                issue.detail,
-                style: text.bodySmall?.copyWith(height: 1.45),
+                problem.detail,
+                style: text.bodySmall?.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  height: 1.45,
+                ),
               ),
             ],
           ),
@@ -827,155 +713,229 @@ class _IssueRow extends StatelessWidget {
   }
 }
 
-class _RecommendationsSection extends StatelessWidget {
-  const _RecommendationsSection({required this.recommendations});
+class _ImpactSection extends StatelessWidget {
+  const _ImpactSection({required this.impacts});
 
-  final List<RecommendationView> recommendations;
-
-  @override
-  Widget build(BuildContext context) {
-    final text = AppTypography.textTheme;
-
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Recommendations', style: text.titleMedium),
-          const SizedBox(height: AppSpacing.md),
-          if (recommendations.isEmpty)
-            Text(
-              'No recommendations right now. Keep an eye on confidence and latency.',
-              style: text.bodyMedium?.copyWith(
-                color: AppColors.onSurfaceVariant,
-                height: 1.45,
-              ),
-            )
-          else
-            for (var i = 0; i < recommendations.length; i++) ...[
-              if (i > 0) const SizedBox(height: AppSpacing.sm),
-              _RecommendationTile(
-                item: recommendations[i],
-                index: i + 1,
-              ),
-            ],
-        ],
-      ),
-    );
-  }
-}
-
-class _RecommendationTile extends StatelessWidget {
-  const _RecommendationTile({
-    required this.item,
-    required this.index,
-  });
-
-  final RecommendationView item;
-  final int index;
+  final List<ServiceImpactView> impacts;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLow.withValues(alpha: 0.65),
-        borderRadius: AppRadius.mdAll,
-        border: Border.all(color: AppColors.outlineSubtle),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 28,
-            height: 28,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppColors.primaryContainer,
-              borderRadius: AppRadius.smAll,
-            ),
-            child: Text(
-              '$index',
-              style: text.labelMedium?.copyWith(color: AppColors.primary),
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Icon(item.icon, size: 16, color: AppColors.primary),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(
-                      child: Text(item.title, style: text.titleSmall),
-                    ),
-                  ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionEyebrow('Impact'),
+        const SizedBox(height: AppSpacing.sm),
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Where you might feel it', style: text.titleMedium),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                'A calm estimate for common developer workflows.',
+                style: text.bodySmall?.copyWith(
+                  color: AppColors.onSurfaceVariant,
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  item.detail,
-                  style: text.bodySmall?.copyWith(height: 1.45),
-                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              for (var i = 0; i < impacts.length; i++) ...[
+                if (i > 0) const SizedBox(height: AppSpacing.sm),
+                _ImpactRow(impact: impacts[i]),
               ],
-            ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 }
 
-class _RecommendedFixesSection extends StatelessWidget {
-  const _RecommendedFixesSection({
-    required this.fixes,
+class _ImpactRow extends StatelessWidget {
+  const _ImpactRow({required this.impact});
+
+  final ServiceImpactView impact;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    final tone = switch (impact.level.toLowerCase()) {
+      'high' => StatusBadgeTone.error,
+      'medium' => StatusBadgeTone.warning,
+      'low' => StatusBadgeTone.info,
+      _ => StatusBadgeTone.success,
+    };
+
+    return Row(
+      children: [
+        Icon(impact.icon, size: 18, color: AppColors.onSurfaceVariant),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(child: Text(impact.name, style: text.titleSmall)),
+        StatusBadge(label: impact.label, tone: tone, showDot: false),
+      ],
+    );
+  }
+}
+
+class _RecommendationSection extends StatelessWidget {
+  const _RecommendationSection({
+    required this.primary,
+    required this.secondary,
     required this.fixProvider,
     this.onRerunDiagnostics,
   });
 
-  final List<RecommendedFixView> fixes;
+  final RecommendedFixView? primary;
+  final List<RecommendedFixView> secondary;
   final FixProvider fixProvider;
   final VoidCallback? onRerunDiagnostics;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('Recommended fixes', style: text.titleMedium),
-        const SizedBox(height: AppSpacing.xxs),
-        Text(
-          'Suggested Auto Fix actions for issues found in this scan.',
-          style: text.bodySmall?.copyWith(
-            color: AppColors.onSurfaceVariant,
-            height: 1.4,
-          ),
-        ),
-        const SizedBox(height: AppSpacing.md),
-        if (fixes.isEmpty)
+        const _SectionEyebrow('Recommendation'),
+        const SizedBox(height: AppSpacing.sm),
+        if (primary == null)
           GlassCard(
-            child: Text(
-              'No Auto Fix suggestions for this report yet.',
-              style: text.bodyMedium?.copyWith(
-                color: AppColors.onSurfaceVariant,
-                height: 1.45,
-              ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('No change needed right now', style: text.titleMedium),
+                const SizedBox(height: AppSpacing.sm),
+                Text(
+                  'This check didn’t point to an automatic fix. Keep an eye on speed and try again if something still feels off.',
+                  style: text.bodyMedium?.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                ),
+              ],
             ),
           )
-        else
-          for (var i = 0; i < fixes.length; i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.sm),
-            RecommendedFixCard(
-              fix: fixes[i],
-              fixProvider: fixProvider,
-              onRerunDiagnostics: onRerunDiagnostics,
+        else ...[
+          RecommendedFixCard(
+            fix: primary!,
+            fixProvider: fixProvider,
+            onRerunDiagnostics: onRerunDiagnostics,
+          ),
+          if (secondary.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.lg),
+            Text('Other possible actions', style: text.titleSmall),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              'Optional ideas that may help in related cases.',
+              style: text.bodySmall?.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
             ),
+            const SizedBox(height: AppSpacing.sm),
+            for (var i = 0; i < secondary.length; i++) ...[
+              if (i > 0) const SizedBox(height: AppSpacing.sm),
+              RecommendedFixCard(
+                fix: secondary[i],
+                fixProvider: fixProvider,
+                onRerunDiagnostics: onRerunDiagnostics,
+                compact: true,
+              ),
+            ],
           ],
+        ],
       ],
+    );
+  }
+}
+
+class _TechnicalDetailsSection extends StatelessWidget {
+  const _TechnicalDetailsSection({required this.details});
+
+  final List<TechnicalDetailView> details;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionEyebrow('Technical details'),
+        const SizedBox(height: AppSpacing.sm),
+        GlassCard(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'For advanced users',
+                style: AppTypography.textTheme.titleMedium,
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Raw check details stay tucked away unless you need them.',
+                style: AppTypography.textTheme.bodySmall?.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  height: 1.4,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.md),
+              _TechnicalExpander(details: details),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _TechnicalExpander extends StatelessWidget {
+  const _TechnicalExpander({required this.details});
+
+  final List<TechnicalDetailView> details;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    return Theme(
+      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+      child: Material(
+        color: Colors.transparent,
+        child: ExpansionTile(
+        tilePadding: EdgeInsets.zero,
+        childrenPadding: const EdgeInsets.only(bottom: AppSpacing.xs),
+        title: Text(
+          'View technical details',
+          style: text.titleSmall?.copyWith(color: AppColors.primary),
+        ),
+        iconColor: AppColors.primary,
+        collapsedIconColor: AppColors.onSurfaceMuted,
+        children: [
+          if (details.isEmpty)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                'No raw logs for this run.',
+                style: text.bodySmall?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                ),
+              ),
+            )
+          else
+            for (final detail in details)
+              Padding(
+                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: SelectableText(
+                    '${detail.label}: ${detail.value}',
+                    style: text.bodySmall?.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ),
+        ],
+      ),
+      ),
     );
   }
 }
@@ -988,8 +948,8 @@ class _ScoreRingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide / 2 - 10;
-    const stroke = 10.0;
+    final radius = size.shortestSide / 2 - 8;
+    const stroke = 9.0;
 
     final track = Paint()
       ..color = AppColors.surfaceHighest
@@ -1023,189 +983,4 @@ class _ScoreRingPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _ScoreRingPainter oldDelegate) =>
       oldDelegate.progress != progress;
-}
-
-class _LatencyBarsPainter extends CustomPainter {
-  _LatencyBarsPainter({
-    required this.bars,
-    required this.progress,
-  });
-
-  final List<LatencyBarView> bars;
-  final double progress;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (bars.isEmpty) return;
-
-    final maxMs = bars.map((b) => b.ms).reduce(math.max).clamp(1, 9999);
-    const labelH = 18.0;
-    const topPad = 8.0;
-    final chartH = size.height - labelH - topPad;
-    final slot = size.width / bars.length;
-    final barW = slot * 0.52;
-
-    for (var i = 0; i < bars.length; i++) {
-      final bar = bars[i];
-      final h = chartH * (bar.ms / maxMs) * progress;
-      final x = slot * i + (slot - barW) / 2;
-      final y = topPad + chartH - h;
-      final color = switch (bar.tone) {
-        StatusBadgeTone.success => AppColors.success,
-        StatusBadgeTone.warning => AppColors.warning,
-        StatusBadgeTone.error => AppColors.error,
-        _ => AppColors.primary,
-      };
-
-      final rrect = RRect.fromRectAndRadius(
-        Rect.fromLTWH(x, y, barW, math.max(h, 2)),
-        const Radius.circular(8),
-      );
-
-      final paint = Paint()
-        ..shader = LinearGradient(
-          begin: Alignment.bottomCenter,
-          end: Alignment.topCenter,
-          colors: [
-            color.withValues(alpha: 0.35),
-            color,
-          ],
-        ).createShader(rrect.outerRect);
-
-      canvas.drawRRect(rrect, paint);
-
-      final tp = TextPainter(
-        text: TextSpan(
-          text: bar.label,
-          style: AppTypography.textTheme.labelSmall?.copyWith(
-            color: AppColors.onSurfaceMuted,
-            fontSize: 10,
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout(maxWidth: slot);
-
-      tp.paint(
-        canvas,
-        Offset(
-          slot * i + (slot - tp.width) / 2,
-          size.height - tp.height,
-        ),
-      );
-
-      if (progress > 0.85) {
-        final value = TextPainter(
-          text: TextSpan(
-            text: '${bar.ms.round()}',
-            style: AppTypography.textTheme.labelMedium?.copyWith(
-              color: AppColors.onSurface,
-              fontFeatures: const [FontFeature.tabularFigures()],
-            ),
-          ),
-          textDirection: TextDirection.ltr,
-        )..layout();
-        value.paint(
-          canvas,
-          Offset(x + (barW - value.width) / 2, y - value.height - 4),
-        );
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _LatencyBarsPainter oldDelegate) =>
-      oldDelegate.progress != progress;
-}
-
-class _SparklinePainter extends CustomPainter {
-  _SparklinePainter({
-    required this.values,
-    required this.progress,
-    required this.color,
-    this.fill = false,
-    this.strokeWidth = 2.5,
-  });
-
-  final List<double> values;
-  final double progress;
-  final Color color;
-  final bool fill;
-  final double strokeWidth;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (values.length < 2) return;
-
-    final minV = values.reduce(math.min);
-    final maxV = values.reduce(math.max);
-    final range = (maxV - minV).abs() < 0.001 ? 1.0 : (maxV - minV);
-    final count = values.length;
-    final visible = math.max(2, (count * progress).ceil());
-
-    Offset pointFor(int i) {
-      final x = size.width * (i / (count - 1));
-      final norm = (values[i] - minV) / range;
-      final y = size.height - (norm * (size.height - 8)) - 4;
-      return Offset(x, y);
-    }
-
-    final path = Path()..moveTo(pointFor(0).dx, pointFor(0).dy);
-    for (var i = 1; i < visible; i++) {
-      final p0 = pointFor(i - 1);
-      final p1 = pointFor(i);
-      final mid = Offset((p0.dx + p1.dx) / 2, (p0.dy + p1.dy) / 2);
-      path.quadraticBezierTo(p0.dx, p0.dy, mid.dx, mid.dy);
-    }
-    final last = pointFor(visible - 1);
-    path.lineTo(last.dx, last.dy);
-
-    if (fill) {
-      final fillPath = Path.from(path)
-        ..lineTo(last.dx, size.height)
-        ..lineTo(0, size.height)
-        ..close();
-      canvas.drawPath(
-        fillPath,
-        Paint()
-          ..shader = LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              color.withValues(alpha: 0.28),
-              color.withValues(alpha: 0.0),
-            ],
-          ).createShader(Offset.zero & size),
-      );
-    }
-
-    canvas.drawPath(
-      path,
-      Paint()
-        ..color = color
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = strokeWidth
-        ..strokeCap = StrokeCap.round
-        ..strokeJoin = StrokeJoin.round,
-    );
-
-    if (fill && progress > 0.9) {
-      canvas.drawCircle(
-        last,
-        4,
-        Paint()..color = color,
-      );
-      canvas.drawCircle(
-        last,
-        7,
-        Paint()
-          ..color = color.withValues(alpha: 0.25)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _SparklinePainter oldDelegate) =>
-      oldDelegate.progress != progress || oldDelegate.color != color;
 }

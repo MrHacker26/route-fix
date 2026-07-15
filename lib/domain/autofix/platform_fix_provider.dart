@@ -13,21 +13,22 @@ abstract base class PlatformFixProvider implements FixProvider {
   static const List<FixAction> catalog = [
     FixAction(
       kind: FixActionKind.disableIpv6,
-      title: 'Disable IPv6',
+      title: 'Prefer IPv4',
       description:
-          'Prefer IPv4 when IPv6 paths are unavailable or pathological.',
+          'Skip a slow IPv6 path so everyday developer tools can respond faster.',
       availability: FixAvailability.available,
       supportedPlatforms: {
         FixPlatform.linux,
         FixPlatform.macOS,
         FixPlatform.windows,
       },
-      relatedIssueCodes: ['ipv6_unavailable', 'ipv6_latency'],
+      relatedIssueCodes: ['ipv6_latency'],
     ),
     FixAction(
       kind: FixActionKind.enableIpv6,
-      title: 'Enable IPv6',
-      description: 'Restore IPv6 if it was previously disabled.',
+      title: 'Turn IPv6 back on',
+      description:
+          'Restore IPv6 if it was switched off and you want dual-stack again.',
       availability: FixAvailability.available,
       supportedPlatforms: {
         FixPlatform.linux,
@@ -38,8 +39,9 @@ abstract base class PlatformFixProvider implements FixProvider {
     ),
     FixAction(
       kind: FixActionKind.flushDns,
-      title: 'Flush DNS',
-      description: 'Clear local DNS caches after resolver changes.',
+      title: 'Refresh DNS',
+      description:
+          'Clear saved name lookups after your network or resolver changes.',
       availability: FixAvailability.comingSoon,
       supportedPlatforms: {
         FixPlatform.linux,
@@ -51,7 +53,8 @@ abstract base class PlatformFixProvider implements FixProvider {
     FixAction(
       kind: FixActionKind.openWarp,
       title: 'Open WARP',
-      description: 'Launch Cloudflare WARP when edge routing may help.',
+      description:
+          'Try Cloudflare WARP when public routes feel congested.',
       availability: FixAvailability.comingSoon,
       supportedPlatforms: {
         FixPlatform.linux,

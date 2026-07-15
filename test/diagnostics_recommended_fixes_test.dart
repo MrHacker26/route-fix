@@ -1,5 +1,6 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:route_fix/data/autofix/macos_fix_provider.dart';
+import 'package:route_fix/domain/autofix/autofix.dart';
 import 'package:route_fix/domain/models/diagnostics/diagnostic_issue.dart';
 import 'package:route_fix/domain/models/diagnostics/diagnostic_report.dart';
 import 'package:route_fix/domain/models/diagnostics/diagnostic_severity.dart';
@@ -7,7 +8,7 @@ import 'package:route_fix/domain/models/diagnostics/network_health.dart';
 import 'package:route_fix/features/diagnostics/diagnostics_result_view_data.dart';
 
 void main() {
-  test('maps FixActions related to report issues into recommended fix cards', () {
+  test('surfaces one primary fix and avoids contradictory IPv6 actions', () {
     final report = DiagnosticReport(
       id: 'r1',
       createdAt: DateTime.utc(2026, 7, 15),
@@ -22,6 +23,13 @@ void main() {
           code: 'ipv6_latency',
           metadata: {'rule_confidence': '0.96'},
         ),
+        DiagnosticIssue(
+          id: 'ipv6_unavailable',
+          title: 'IPv6 unavailable',
+          description: 'Down',
+          severity: DiagnosticSeverity.low,
+          code: 'ipv6_unavailable',
+        ),
       ],
       recommendations: const [],
       metadata: const {
@@ -30,18 +38,19 @@ void main() {
       },
     );
 
-    final data = DiagnosticsResultViewData.fromReport(
-      report,
+    final selected = DiagnosticsResultViewData.selectRecommendedFixes(
+      report: report,
       fixProvider: const MacOsFixProvider(),
     );
 
-    final disable = data.recommendedFixes
-        .firstWhere((fix) => fix.id == 'disableIpv6');
-
-    expect(disable.title, 'Disable IPv6');
-    expect(disable.why, 'Your IPv6 latency is 18× higher than IPv4.');
-    expect(disable.confidenceLabel, '96%');
-    expect(disable.estimatedImprovement, 'High');
+    expect(selected.primary?.kind, FixActionKind.disableIpv6);
+    expect(
+      selected.secondary.map((f) => f.kind),
+      isNot(contains(FixActionKind.enableIpv6)),
+    );
+    expect(selected.primary?.why, contains('slower than IPv4'));
+    expect(selected.primary?.confidenceLabel, '96%');
+    expect(selected.primary?.backedByRuleIds, contains('ipv6_latency'));
   });
 
   test('returns no recommended fixes when there are no matching issues', () {
@@ -59,6 +68,7 @@ void main() {
       fixProvider: const MacOsFixProvider(),
     );
 
-    expect(data.recommendedFixes, isEmpty);
+    expect(data.primaryFix, isNull);
+    expect(data.secondaryFixes, isEmpty);
   });
 }

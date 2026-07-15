@@ -324,7 +324,7 @@ class _Header extends StatelessWidget {
                     children: [
                       Text('Diagnostics', style: text.headlineSmall),
                       Text(
-                        'Fake progress · every hop animated',
+                        'Quiet scan animation',
                         style: text.bodySmall,
                       ),
                     ],

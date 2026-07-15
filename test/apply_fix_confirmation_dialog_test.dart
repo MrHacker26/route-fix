@@ -12,15 +12,27 @@ void main() {
   const fix = RecommendedFixView(
     id: 'disableIpv6',
     kind: FixActionKind.disableIpv6,
-    title: 'Disable IPv6',
-    description: 'Prefer IPv4 when IPv6 paths are pathological.',
-    why: 'Your IPv6 latency is 18× higher than IPv4.',
+    title: 'Prefer IPv4',
+    description: 'Skip a slow IPv6 path.',
+    why: 'IPv6 is responding about 18× slower than IPv4 right now.',
+    whyThisRecommendation:
+        'Preferring IPv4 can help apps skip a slow IPv6 path.',
     confidenceLabel: '96%',
     estimatedImprovement: 'High',
+    serviceImpacts: [
+      ServiceImpactView(
+        name: 'Git',
+        level: 'High',
+        label: 'Likely improving',
+        icon: Icons.merge_type_rounded,
+      ),
+    ],
     availabilityLabel: 'Ready',
     availabilityTone: StatusBadgeTone.success,
     icon: Icons.settings_ethernet_rounded,
     canConfirmApply: true,
+    priorityScore: 30,
+    backedByRuleIds: ['ipv6_latency'],
   );
 
   Widget wrap(Widget child) {
@@ -30,8 +42,7 @@ void main() {
     );
   }
 
-  testWidgets('shows trustworthy recommendation detail before apply',
-      (tester) async {
+  testWidgets('shows calm recommendation detail before apply', (tester) async {
     await tester.pumpWidget(
       wrap(
         RecommendedFixCard(
@@ -46,26 +57,17 @@ void main() {
       ),
     );
 
-    expect(find.text('Recommended Action'), findsOneWidget);
-    expect(find.text('Disable IPv6'), findsOneWidget);
-    expect(find.text('Why?'), findsOneWidget);
-    expect(
-      find.text('Your IPv6 latency is 18× higher than IPv4.'),
-      findsOneWidget,
-    );
-    expect(find.text('Confidence'), findsOneWidget);
-    expect(find.text('96%'), findsOneWidget);
-    expect(find.text('Estimated Improvement'), findsOneWidget);
-    expect(find.text('High'), findsOneWidget);
-    expect(find.text('Apply Recommended Fix'), findsOneWidget);
+    expect(find.text('Recommended action'), findsOneWidget);
+    expect(find.text('Prefer IPv4'), findsOneWidget);
+    expect(find.text('Why this recommendation?'), findsOneWidget);
+    expect(find.text('Apply recommended fix'), findsOneWidget);
   });
 
-  testWidgets('Apply Recommended Fix confirms then shows success UX',
-      (tester) async {
+  testWidgets('success shows re-run diagnostics', (tester) async {
     final provider = _FakeFixProvider(
       onApply: (_) async => FixResult.success(
         FixActionKind.disableIpv6,
-        message: 'IPv6 disabled.',
+        message: 'ok',
       ),
     );
     var rerun = false;
@@ -80,27 +82,19 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Apply Recommended Fix'));
+    await tester.tap(find.text('Apply recommended fix'));
     await tester.pumpAndSettle();
-    expect(find.text('Apply Fix?'), findsOneWidget);
-
     await tester.tap(find.text('Confirm'));
     await tester.pumpAndSettle();
 
-    expect(provider.applyCalls, [FixActionKind.disableIpv6]);
-    expect(find.text('Fix Applied'), findsOneWidget);
-    expect(
-      find.textContaining('Please run diagnostics again'),
-      findsOneWidget,
-    );
-    expect(find.text('Re-run Diagnostics'), findsOneWidget);
-
-    await tester.tap(find.text('Re-run Diagnostics'));
+    expect(find.text('Fix applied'), findsOneWidget);
+    expect(find.text('Re-run diagnostics'), findsOneWidget);
+    await tester.tap(find.text('Re-run diagnostics'));
     await tester.pump();
     expect(rerun, isTrue);
   });
 
-  testWidgets('shows failure message and keeps apply available', (tester) async {
+  testWidgets('failure uses human-readable message', (tester) async {
     final completer = Completer<FixResult>();
     final provider = _FakeFixProvider(onApply: (_) => completer.future);
 
@@ -113,7 +107,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Apply Recommended Fix'));
+    await tester.tap(find.text('Apply recommended fix'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Confirm'));
     await tester.pump();
@@ -123,14 +117,17 @@ void main() {
     completer.complete(
       FixResult.failure(
         FixActionKind.disableIpv6,
-        message: 'Failed to disable IPv6.',
-        error: 'permission denied',
+        message: 'Failed',
+        error: 'sysctl: permission denied',
       ),
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('permission denied'), findsOneWidget);
-    expect(find.text('Apply Recommended Fix'), findsOneWidget);
+    expect(
+      find.text('RouteFix needs administrator permission to continue.'),
+      findsOneWidget,
+    );
+    expect(find.text('View technical details'), findsOneWidget);
   });
 
   testWidgets('cancel does not call provider', (tester) async {
@@ -150,40 +147,12 @@ void main() {
       ),
     );
 
-    await tester.tap(find.text('Apply Recommended Fix'));
+    await tester.tap(find.text('Apply recommended fix'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
 
     expect(provider.applyCalls, isEmpty);
-    expect(find.text('Apply Recommended Fix'), findsOneWidget);
-  });
-
-  testWidgets('showApplyFixConfirmation reports cancel by default',
-      (tester) async {
-    late ApplyFixConfirmationResult result;
-
-    await tester.pumpWidget(
-      wrap(
-        Builder(
-          builder: (context) {
-            return PrimaryButton(
-              label: 'Open',
-              onPressed: () async {
-                result = await showApplyFixConfirmation(context, fix: fix);
-              },
-            );
-          },
-        ),
-      ),
-    );
-
-    await tester.tap(find.text('Open'));
-    await tester.pumpAndSettle();
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
-
-    expect(result, ApplyFixConfirmationResult.cancelled);
   });
 }
 

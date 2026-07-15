@@ -26,11 +26,11 @@ final class GitHubConnectivityRule
       confidence: 0.92,
       recommendation: Recommendation(
         id: 'github-unreachable',
-        title: 'GitHub is unreachable',
+        title: 'GitHub is hard to reach',
         detail: input.error ??
             (status != null
-                ? 'GitHub probe returned HTTP $status.'
-                : 'GitHub probe did not complete successfully.'),
+                ? 'GitHub answered with an unexpected status ($status).'
+                : 'We couldn’t complete a check against GitHub just now.'),
         priority: DiagnosticSeverity.high,
       ),
     );
