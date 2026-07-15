@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../design_system/design_system.dart';
+import '../../domain/autofix/fix_provider.dart';
+import '../../domain/autofix/models/fix_action.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import '../../domain/models/diagnostics/diagnostic_severity.dart';
 
@@ -18,6 +20,7 @@ final class DiagnosticsResultViewData {
     required this.metricCards,
     required this.issues,
     required this.recommendations,
+    this.recommendedFixes = const [],
   });
 
   final int overallScore;
@@ -31,12 +34,17 @@ final class DiagnosticsResultViewData {
   final List<MetricCardView> metricCards;
   final List<IssueView> issues;
   final List<RecommendationView> recommendations;
+  final List<RecommendedFixView> recommendedFixes;
 
   bool get hasIssues => issues.isNotEmpty;
   bool get hasRecommendations => recommendations.isNotEmpty;
+  bool get hasRecommendedFixes => recommendedFixes.isNotEmpty;
   bool get hasMetrics => metricCards.isNotEmpty;
 
-  factory DiagnosticsResultViewData.fromReport(DiagnosticReport report) {
+  factory DiagnosticsResultViewData.fromReport(
+    DiagnosticReport report, {
+    FixProvider? fixProvider,
+  }) {
     final meta = report.metadata;
     final scoreTone = _toneForScore(report.health.score);
 
@@ -76,6 +84,10 @@ final class DiagnosticsResultViewData {
         )
         .toList(growable: false);
 
+    final recommendedFixes = fixProvider == null
+        ? const <RecommendedFixView>[]
+        : recommendedFixesFor(report: report, fixProvider: fixProvider);
+
     return DiagnosticsResultViewData(
       overallScore: report.health.score,
       scoreLabel: report.health.label,
@@ -88,7 +100,68 @@ final class DiagnosticsResultViewData {
       metricCards: cards,
       issues: issues,
       recommendations: recommendations,
+      recommendedFixes: recommendedFixes,
     );
+  }
+
+  /// Maps host [FixAction]s whose related issue codes appear in [report].
+  static List<RecommendedFixView> recommendedFixesFor({
+    required DiagnosticReport report,
+    required FixProvider fixProvider,
+  }) {
+    final issueCodes = <String>{
+      for (final issue in report.issues) ...[
+        issue.id,
+        if (issue.code != null) issue.code!,
+      ],
+    };
+
+    if (issueCodes.isEmpty) return const [];
+
+    final views = <RecommendedFixView>[];
+    for (final action in fixProvider.availableActions()) {
+      if (action.availability == FixAvailability.unsupported) continue;
+      if (!action.relatedIssueCodes.any(issueCodes.contains)) continue;
+
+      views.add(
+        RecommendedFixView(
+          id: action.id,
+          title: action.title,
+          description: action.description,
+          availabilityLabel: _availabilityLabel(action.availability),
+          availabilityTone: _availabilityTone(action.availability),
+          icon: _iconForFix(action.kind),
+        ),
+      );
+    }
+    return List.unmodifiable(views);
+  }
+
+  static String _availabilityLabel(FixAvailability availability) {
+    return switch (availability) {
+      FixAvailability.available => 'Ready',
+      FixAvailability.requiresElevation => 'Needs admin',
+      FixAvailability.comingSoon => 'Coming soon',
+      FixAvailability.unsupported => 'Unsupported',
+    };
+  }
+
+  static StatusBadgeTone _availabilityTone(FixAvailability availability) {
+    return switch (availability) {
+      FixAvailability.available => StatusBadgeTone.success,
+      FixAvailability.requiresElevation => StatusBadgeTone.warning,
+      FixAvailability.comingSoon => StatusBadgeTone.neutral,
+      FixAvailability.unsupported => StatusBadgeTone.neutral,
+    };
+  }
+
+  static IconData _iconForFix(FixActionKind kind) {
+    return switch (kind) {
+      FixActionKind.disableIpv6 || FixActionKind.enableIpv6 =>
+        Icons.settings_ethernet_rounded,
+      FixActionKind.flushDns => Icons.dns_outlined,
+      FixActionKind.openWarp => Icons.travel_explore_rounded,
+    };
   }
 
   static List<LatencyBarView> _latencyBarsFrom(Map<String, String> meta) {
@@ -360,5 +433,24 @@ class RecommendationView {
 
   final String title;
   final String detail;
+  final IconData icon;
+}
+
+/// Presentation model for an Auto Fix suggestion on the results screen.
+class RecommendedFixView {
+  const RecommendedFixView({
+    required this.id,
+    required this.title,
+    required this.description,
+    required this.availabilityLabel,
+    required this.availabilityTone,
+    required this.icon,
+  });
+
+  final String id;
+  final String title;
+  final String description;
+  final String availabilityLabel;
+  final StatusBadgeTone availabilityTone;
   final IconData icon;
 }

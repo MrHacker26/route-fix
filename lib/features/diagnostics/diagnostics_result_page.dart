@@ -7,6 +7,7 @@ import '../../design_system/design_system.dart';
 import '../../di/app_services.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import 'diagnostics_result_view_data.dart';
+import 'recommended_fix_card.dart';
 
 /// Diagnostics result report powered by a real [DiagnosticReport].
 class DiagnosticsResultPage extends StatefulWidget {
@@ -62,7 +63,10 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
   }
 
   void _applyReport(DiagnosticReport report) {
-    final data = DiagnosticsResultViewData.fromReport(report);
+    final data = DiagnosticsResultViewData.fromReport(
+      report,
+      fixProvider: AppServices.fixProvider,
+    );
     setState(() {
       _data = data;
       _loading = false;
@@ -262,6 +266,14 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                             interval: const Interval(0.36, 0.75),
                             child: _RecommendationsSection(
                               recommendations: data.recommendations,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _FadeIn(
+                            animation: _entrance,
+                            interval: const Interval(0.42, 0.82),
+                            child: _RecommendedFixesSection(
+                              fixes: data.recommendedFixes,
                             ),
                           ),
                         ],
@@ -909,6 +921,48 @@ class _RecommendationTile extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _RecommendedFixesSection extends StatelessWidget {
+  const _RecommendedFixesSection({required this.fixes});
+
+  final List<RecommendedFixView> fixes;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text('Recommended fixes', style: text.titleMedium),
+        const SizedBox(height: AppSpacing.xxs),
+        Text(
+          'Suggested Auto Fix actions for issues found in this scan.',
+          style: text.bodySmall?.copyWith(
+            color: AppColors.onSurfaceVariant,
+            height: 1.4,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.md),
+        if (fixes.isEmpty)
+          GlassCard(
+            child: Text(
+              'No Auto Fix suggestions for this report yet.',
+              style: text.bodyMedium?.copyWith(
+                color: AppColors.onSurfaceVariant,
+                height: 1.45,
+              ),
+            ),
+          )
+        else
+          for (var i = 0; i < fixes.length; i++) ...[
+            if (i > 0) const SizedBox(height: AppSpacing.sm),
+            RecommendedFixCard(fix: fixes[i]),
+          ],
+      ],
     );
   }
 }
