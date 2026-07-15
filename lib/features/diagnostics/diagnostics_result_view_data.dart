@@ -131,6 +131,10 @@ final class DiagnosticsResultViewData {
           availabilityLabel: _availabilityLabel(action.availability),
           availabilityTone: _availabilityTone(action.availability),
           icon: _iconForFix(action.kind),
+          canConfirmApply: action.availability == FixAvailability.available ||
+              action.availability == FixAvailability.requiresElevation,
+          requiresElevation:
+              action.availability == FixAvailability.requiresElevation,
         ),
       );
     }
@@ -445,6 +449,8 @@ class RecommendedFixView {
     required this.availabilityLabel,
     required this.availabilityTone,
     required this.icon,
+    this.canConfirmApply = false,
+    this.requiresElevation = false,
   });
 
   final String id;
@@ -453,4 +459,10 @@ class RecommendedFixView {
   final String availabilityLabel;
   final StatusBadgeTone availabilityTone;
   final IconData icon;
+
+  /// Whether the Apply Fix confirmation flow can be opened.
+  final bool canConfirmApply;
+
+  /// Whether confirming later will typically need elevation.
+  final bool requiresElevation;
 }
