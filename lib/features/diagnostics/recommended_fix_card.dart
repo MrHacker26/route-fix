@@ -83,18 +83,26 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
 
     if (!mounted) return;
 
+    if (result.wasCancelled) {
+      setState(() {
+        _phase = _ApplyPhase.idle;
+        _failureMessage = null;
+        _failureTechnical = null;
+      });
+      return;
+    }
+
     if (result.success) {
       setState(() {
         _phase = _ApplyPhase.success;
         _failureMessage = null;
         _failureTechnical = null;
       });
-      final next = await showAutoFixSuccessDialog(context);
+      await showAutoFixSuccessDialog(context);
       if (!mounted) return;
       widget.onApplied?.call();
-      if (next == AutoFixSuccessDialogResult.runDiagnosticsAgain) {
-        widget.onRerunDiagnostics?.call();
-      }
+      // Automatically re-run diagnostics and refresh the dashboard / results.
+      widget.onRerunDiagnostics?.call();
       return;
     }
 

@@ -13,7 +13,7 @@ enum StatusBadgeTone {
   neutral,
 }
 
-/// Compact status pill for diagnostic states.
+/// Compact, lightweight status pill — typography-led, soft fill.
 class StatusBadge extends StatelessWidget {
   const StatusBadge({
     super.key,
@@ -40,17 +40,19 @@ class StatusBadge extends StatelessWidget {
         decoration: BoxDecoration(
           color: colors.container,
           borderRadius: AppRadius.pill,
-          border: Border.all(color: colors.foreground.withValues(alpha: 0.25)),
+          border: Border.all(
+            color: colors.foreground.withValues(alpha: 0.14),
+          ),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
             if (showDot) ...[
               Container(
-                width: 6,
-                height: 6,
+                width: 5,
+                height: 5,
                 decoration: BoxDecoration(
-                  color: colors.foreground,
+                  color: colors.foreground.withValues(alpha: 0.9),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -58,8 +60,10 @@ class StatusBadge extends StatelessWidget {
             ],
             Text(
               label,
-              style: AppTypography.textTheme.labelMedium?.copyWith(
+              style: AppTypography.textTheme.labelSmall?.copyWith(
                 color: colors.foreground,
+                fontWeight: FontWeight.w500,
+                letterSpacing: 0.1,
               ),
             ),
           ],
@@ -70,25 +74,25 @@ class StatusBadge extends StatelessWidget {
 
   static _Colors _colorsFor(StatusBadgeTone tone) {
     return switch (tone) {
-      StatusBadgeTone.success => const _Colors(
-          AppColors.success,
-          AppColors.successContainer,
+      StatusBadgeTone.success => _Colors(
+          AppColors.success.withValues(alpha: 0.92),
+          AppColors.success.withValues(alpha: 0.10),
         ),
-      StatusBadgeTone.warning => const _Colors(
-          AppColors.warning,
-          AppColors.warningContainer,
+      StatusBadgeTone.warning => _Colors(
+          AppColors.warning.withValues(alpha: 0.92),
+          AppColors.warning.withValues(alpha: 0.10),
         ),
-      StatusBadgeTone.error => const _Colors(
-          AppColors.error,
-          AppColors.errorContainer,
+      StatusBadgeTone.error => _Colors(
+          AppColors.error.withValues(alpha: 0.92),
+          AppColors.error.withValues(alpha: 0.10),
         ),
-      StatusBadgeTone.info => const _Colors(
-          AppColors.info,
-          AppColors.infoContainer,
+      StatusBadgeTone.info => _Colors(
+          AppColors.info.withValues(alpha: 0.92),
+          AppColors.info.withValues(alpha: 0.10),
         ),
-      StatusBadgeTone.neutral => const _Colors(
-          AppColors.onSurfaceVariant,
-          AppColors.surfaceHigh,
+      StatusBadgeTone.neutral => _Colors(
+          AppColors.onSurfaceVariant.withValues(alpha: 0.95),
+          AppColors.onSurface.withValues(alpha: 0.05),
         ),
     };
   }

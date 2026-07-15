@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 
 import '../tokens/app_colors.dart';
@@ -7,19 +5,21 @@ import '../tokens/app_radius.dart';
 import '../tokens/app_shadows.dart';
 import '../tokens/app_spacing.dart';
 
-/// Frosted glass surface — Arc / Raycast style panel with subtle hover lift.
+/// Layered surface card — depth without glassmorphism or blur.
 class GlassCard extends StatefulWidget {
   const GlassCard({
     super.key,
     required this.child,
     this.padding,
     this.borderRadius,
-    this.blurSigma = 24,
+    @Deprecated('Glass blur removed — value is ignored.') this.blurSigma = 0,
   });
 
   final Widget child;
   final EdgeInsetsGeometry? padding;
   final BorderRadius? borderRadius;
+
+  /// Retained for API compatibility; blur is intentionally unused.
   final double blurSigma;
 
   @override
@@ -37,41 +37,33 @@ class _GlassCardState extends State<GlassCard> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        transform: Matrix4.translationValues(0, _hovered ? -1 : 0, 0),
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 160),
-          curve: Curves.easeOutCubic,
-          decoration: BoxDecoration(
-            borderRadius: radius,
-            boxShadow: _hovered ? AppShadows.md : AppShadows.sm,
+        transform: Matrix4.translationValues(0, _hovered ? -2 : 0, 0),
+        decoration: BoxDecoration(
+          borderRadius: radius,
+          boxShadow: _hovered ? AppShadows.md : AppShadows.sm,
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: _hovered
+                ? const [
+                    Color(0xFF1D1D23),
+                    Color(0xFF151518),
+                  ]
+                : const [
+                    AppColors.cardGradientTop,
+                    AppColors.cardGradientBottom,
+                  ],
           ),
-          child: ClipRRect(
-            borderRadius: radius,
-            child: BackdropFilter(
-              filter: ImageFilter.blur(
-                sigmaX: widget.blurSigma,
-                sigmaY: widget.blurSigma,
-              ),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppColors.glassFill,
-                  borderRadius: radius,
-                  border: Border.all(
-                    color: _hovered
-                        ? AppColors.outline
-                        : AppColors.glassBorder,
-                  ),
-                ),
-                child: Padding(
-                  padding:
-                      widget.padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
-                  child: widget.child,
-                ),
-              ),
-            ),
+          border: Border.all(
+            color: _hovered ? AppColors.outline : AppColors.borderSoft,
           ),
+        ),
+        child: Padding(
+          padding:
+              widget.padding ?? const EdgeInsets.all(AppSpacing.cardPadding),
+          child: widget.child,
         ),
       ),
     );

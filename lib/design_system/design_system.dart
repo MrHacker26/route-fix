@@ -3,6 +3,7 @@ library;
 
 export 'app_theme.dart';
 export 'components/glass_card.dart';
+export 'components/page_atmosphere.dart';
 export 'components/primary_button.dart';
 export 'components/secondary_button.dart';
 export 'components/status_badge.dart';

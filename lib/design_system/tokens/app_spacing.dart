@@ -9,11 +9,14 @@ abstract final class AppSpacing {
   static const double xxl = 32;
   static const double xxxl = 48;
 
+  /// Vertical rhythm between major desktop sections (28–32px).
+  static const double sectionGap = 28;
+
   static const double buttonPaddingH = 16;
   static const double buttonPaddingV = 10;
-  static const double cardPadding = 16;
-  static const double badgePaddingH = 10;
-  static const double badgePaddingV = 4;
+  static const double cardPadding = 18;
+  static const double badgePaddingH = 9;
+  static const double badgePaddingV = 3;
 
   /// Desktop command-center content width.
   static const double desktopMaxWidth = 1200;

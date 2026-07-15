@@ -127,6 +127,27 @@ final class FixResult {
     );
   }
 
+  /// User dismissed the OS authentication dialog — not an error.
+  factory FixResult.cancelled(
+    FixActionKind action, {
+    FixPlatform? platform,
+    String? executedCommand,
+    Map<String, String> metadata = const {},
+  }) {
+    return FixResult(
+      action: action,
+      success: false,
+      executed: false,
+      message: 'UserCancelled',
+      platform: platform,
+      executedCommand: executedCommand,
+      metadata: {
+        'outcome': 'UserCancelled',
+        ...metadata,
+      },
+    );
+  }
+
   final FixActionKind action;
 
   /// Whether the provider considers the request fulfilled.
@@ -148,6 +169,10 @@ final class FixResult {
   final bool requiresElevation;
 
   final Map<String, String> metadata;
+
+  /// True when the user cancelled the native authentication dialog.
+  bool get wasCancelled =>
+      message == 'UserCancelled' || metadata['outcome'] == 'UserCancelled';
 
   @override
   bool operator ==(Object other) {

@@ -6,7 +6,7 @@ import 'package:route_fix/domain/autofix/autofix.dart';
 
 void main() {
   group('MacOsFixProvider IPv6', () {
-    test('disables IPv6 on each enabled network service', () async {
+    test('disables IPv6 via privileged osascript on each service', () async {
       final commands = <List<String>>[];
       final provider = MacOsFixProvider(
         runProcess: (executable, arguments) async {
@@ -23,13 +23,15 @@ void main() {
               '',
             );
           }
-          // Active-service probes fail closed → fall back to all enabled.
           if (executable == 'route' ||
               (arguments.isNotEmpty &&
                   arguments.first == '-listnetworkserviceorder')) {
             return ProcessResult(1, 1, '', 'not used');
           }
-          return ProcessResult(1, 0, '', '');
+          if (executable == 'osascript') {
+            return ProcessResult(1, 0, '', '');
+          }
+          return ProcessResult(1, 1, '', 'unexpected');
         },
       );
 
@@ -40,13 +42,11 @@ void main() {
       expect(result.message, contains('Prefer IPv4'));
       expect(result.metadata['applied'], 'Wi-Fi, Thunderbolt Bridge');
       expect(commands.first, ['networksetup', '-listallnetworkservices']);
-      expect(
-        commands.where((c) => c.length >= 3 && c[1] == '-setv6off').toList(),
-        [
-          ['networksetup', '-setv6off', 'Wi-Fi'],
-          ['networksetup', '-setv6off', 'Thunderbolt Bridge'],
-        ],
-      );
+      final osascripts = commands.where((c) => c.first == 'osascript').toList();
+      expect(osascripts, hasLength(2));
+      expect(osascripts[0][2], contains('-setv6off'));
+      expect(osascripts[0][2], contains('Wi-Fi'));
+      expect(osascripts[1][2], contains('Thunderbolt Bridge'));
     });
 
     test('prefers the active service when detectable', () async {
@@ -57,10 +57,12 @@ void main() {
           if (executable == 'route') {
             return ProcessResult(1, 0, 'interface: en0\n', '');
           }
-          if (arguments.first == '-listallnetworkservices') {
+          if (arguments.isNotEmpty &&
+              arguments.first == '-listallnetworkservices') {
             return ProcessResult(1, 0, 'Wi-Fi\nEthernet\n', '');
           }
-          if (arguments.first == '-listnetworkserviceorder') {
+          if (arguments.isNotEmpty &&
+              arguments.first == '-listnetworkserviceorder') {
             return ProcessResult(
               1,
               0,
@@ -71,22 +73,25 @@ void main() {
               '',
             );
           }
-          return ProcessResult(1, 0, '', '');
+          if (executable == 'osascript') {
+            return ProcessResult(1, 0, '', '');
+          }
+          return ProcessResult(1, 1, '', 'unexpected');
         },
       );
 
       final result = await provider.apply(FixActionKind.disableIpv6);
       expect(result.success, isTrue);
       expect(result.metadata['applied'], 'Wi-Fi');
-      expect(
-        commands.where((c) => c.contains('-setv6off')).toList(),
-        [
-          ['networksetup', '-setv6off', 'Wi-Fi'],
-        ],
-      );
+      final scripts =
+          commands.where((c) => c.first == 'osascript').map((c) => c[2]).toList();
+      expect(scripts, hasLength(1));
+      expect(scripts.single, contains('-setv6off'));
+      expect(scripts.single, contains('Wi-Fi'));
+      expect(scripts.single, isNot(contains('Ethernet')));
     });
 
-    test('enables IPv6 with setv6automatic', () async {
+    test('enables IPv6 with privileged setv6automatic', () async {
       final commands = <List<String>>[];
       final provider = MacOsFixProvider(
         runProcess: (executable, arguments) async {
@@ -100,7 +105,10 @@ void main() {
                   arguments.first == '-listnetworkserviceorder')) {
             return ProcessResult(1, 1, '', 'not used');
           }
-          return ProcessResult(1, 0, '', '');
+          if (executable == 'osascript') {
+            return ProcessResult(1, 0, '', '');
+          }
+          return ProcessResult(1, 1, '', 'unexpected');
         },
       );
 
@@ -110,12 +118,42 @@ void main() {
       expect(result.executed, isTrue);
       expect(result.message, contains('restored'));
       expect(result.metadata['mode'], 'automatic');
-      expect(
-        commands.where((c) => c.contains('-setv6automatic')).toList(),
-        [
-          ['networksetup', '-setv6automatic', 'Wi-Fi'],
-        ],
+      final scripts =
+          commands.where((c) => c.first == 'osascript').map((c) => c[2]).toList();
+      expect(scripts, hasLength(1));
+      expect(scripts.single, contains('-setv6automatic'));
+      expect(scripts.single, contains('with administrator privileges'));
+    });
+
+    test('returns UserCancelled when auth dialog is dismissed', () async {
+      final provider = MacOsFixProvider(
+        runProcess: (executable, arguments) async {
+          if (arguments.isNotEmpty &&
+              arguments.first == '-listallnetworkservices') {
+            return ProcessResult(1, 0, 'Wi-Fi\n', '');
+          }
+          if (executable == 'route' ||
+              (arguments.isNotEmpty &&
+                  arguments.first == '-listnetworkserviceorder')) {
+            return ProcessResult(1, 1, '', 'not used');
+          }
+          if (executable == 'osascript') {
+            return ProcessResult(
+              1,
+              1,
+              '',
+              'execution error: User canceled. (-128)',
+            );
+          }
+          return ProcessResult(1, 1, '', 'unexpected');
+        },
       );
+
+      final result = await provider.apply(FixActionKind.disableIpv6);
+      expect(result.wasCancelled, isTrue);
+      expect(result.success, isFalse);
+      expect(result.executed, isFalse);
+      expect(result.message, 'UserCancelled');
     });
 
     test('returns failure when listing services fails', () async {
@@ -132,20 +170,28 @@ void main() {
       expect(result.error, contains('No enabled network services'));
     });
 
-    test('returns failure when no service could be updated', () async {
+    test('returns failure when privileged update fails', () async {
       final provider = MacOsFixProvider(
         runProcess: (executable, arguments) async {
           if (arguments.isNotEmpty &&
               arguments.first == '-listallnetworkservices') {
             return ProcessResult(1, 0, 'Wi-Fi\n', '');
           }
-          return ProcessResult(1, 1, '', 'permission denied');
+          if (executable == 'route' ||
+              (arguments.isNotEmpty &&
+                  arguments.first == '-listnetworkserviceorder')) {
+            return ProcessResult(1, 1, '', 'not used');
+          }
+          if (executable == 'osascript') {
+            return ProcessResult(1, 1, '', 'networksetup failed');
+          }
+          return ProcessResult(1, 1, '', 'unexpected');
         },
       );
 
       final result = await provider.apply(FixActionKind.disableIpv6);
       expect(result.success, isFalse);
-      expect(result.error, contains('permission denied'));
+      expect(result.error, contains('networksetup failed'));
     });
 
     test('returns notImplemented for flushDns', () async {

@@ -70,7 +70,8 @@ void main() {
     expect(find.text('Apply Fix'), findsOneWidget);
   });
 
-  testWidgets('success dialog offers run diagnostics again', (tester) async {
+  testWidgets('success dialog then automatically reruns diagnostics',
+      (tester) async {
     final service = _FakeAutoFixService(
       onApply: (_) async => FixResult.success(
         FixActionKind.disableIpv6,
@@ -102,9 +103,35 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Network Updated'), findsWidgets);
-    await tester.tap(find.text('Run Again').last);
+    await tester.tap(find.text('Done').last);
     await tester.pumpAndSettle();
     expect(rerun, isTrue);
+  });
+
+  testWidgets('user cancellation is not treated as an error', (tester) async {
+    final service = _FakeAutoFixService(
+      onApply: (_) async => FixResult.cancelled(FixActionKind.disableIpv6),
+    );
+
+    await tester.pumpWidget(
+      wrap(
+        RecommendedFixCard(
+          fix: fix,
+          fixProvider: _FakeFixProvider(
+            onApply: (_) async => FixResult.cancelled(FixActionKind.disableIpv6),
+          ),
+          autoFix: service,
+        ),
+      ),
+    );
+
+    await tester.tap(find.text('Apply Fix'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Apply Fix').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Apply Fix'), findsOneWidget);
+    expect(find.text('View technical details'), findsNothing);
   });
 
   testWidgets('failure uses human-readable message with expandable stderr',

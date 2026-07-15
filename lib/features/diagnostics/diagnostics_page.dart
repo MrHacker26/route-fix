@@ -143,14 +143,14 @@ class _DiagnosticsPageState extends State<DiagnosticsPage>
       body: AnimatedBuilder(
         animation: _pulse,
         builder: (context, child) {
-          final glow = 0.04 + (_pulse.value * 0.06);
+          final glow = 0.035 + (_pulse.value * 0.025);
           return DecoratedBox(
             decoration: BoxDecoration(
               gradient: RadialGradient(
                 center: const Alignment(0, -0.85),
                 radius: 1.15,
                 colors: [
-                  AppColors.primary.withValues(alpha: glow),
+                  AppColors.ambience.withValues(alpha: glow),
                   AppColors.background,
                   AppColors.background,
                 ],

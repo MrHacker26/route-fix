@@ -8,6 +8,7 @@ import '../../design_system/design_system.dart';
 import '../../di/app_services.dart';
 import '../diagnostics/diagnostics_page.dart';
 import '../diagnostics/diagnostics_result_page.dart';
+import '../network_controls/network_controls_page.dart';
 import 'dashboard_view_data.dart';
 
 /// Desktop command center — powered by [DiagnosticsCoordinator].
@@ -133,6 +134,24 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
+  void _openNetworkControls() {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (context, animation, secondary) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: const NetworkControlsPage(),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.sizeOf(context).width;
@@ -148,19 +167,7 @@ class _DashboardPageState extends State<DashboardPage>
         autofocus: true,
         child: Scaffold(
           backgroundColor: AppColors.background,
-          body: DecoratedBox(
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  AppColors.atmosphere,
-                  AppColors.background,
-                  AppColors.background,
-                ],
-                stops: [0.0, 0.28, 1.0],
-              ),
-            ),
+          body: PageAtmosphere(
             child: SafeArea(
               child: Center(
                 child: ConstrainedBox(
@@ -177,6 +184,7 @@ class _DashboardPageState extends State<DashboardPage>
                         scannedAt: data?.scannedAtLabel,
                         onRunScan: _loading ? null : _openScan,
                         onRefresh: _loading ? null : _load,
+                        onNetworkControls: _openNetworkControls,
                       ),
                       Expanded(
                         child: CustomScrollView(
@@ -241,7 +249,7 @@ class _DashboardPageState extends State<DashboardPage>
                                               ],
                                             ),
                                     ),
-                                    const SizedBox(height: AppSpacing.sm),
+                                    const SizedBox(height: AppSpacing.sectionGap),
                                     _FadeIn(
                                       animation: _entrance,
                                       interval: const Interval(0.12, 0.55),
@@ -302,7 +310,7 @@ class _DashboardPageState extends State<DashboardPage>
                                               ],
                                             ),
                                     ),
-                                    const SizedBox(height: AppSpacing.sm),
+                                    const SizedBox(height: AppSpacing.sectionGap),
                                     _FadeIn(
                                       animation: _entrance,
                                       interval: const Interval(0.22, 0.65),
@@ -310,7 +318,7 @@ class _DashboardPageState extends State<DashboardPage>
                                         services: data.services,
                                       ),
                                     ),
-                                    const SizedBox(height: AppSpacing.sm),
+                                    const SizedBox(height: AppSpacing.sectionGap),
                                     _FadeIn(
                                       animation: _entrance,
                                       interval: const Interval(0.32, 0.75),
@@ -370,6 +378,7 @@ class _DesktopToolbar extends StatelessWidget {
     required this.error,
     required this.onRunScan,
     required this.onRefresh,
+    required this.onNetworkControls,
     this.healthLabel,
     this.healthTone,
     this.scannedAt,
@@ -382,6 +391,7 @@ class _DesktopToolbar extends StatelessWidget {
   final String? scannedAt;
   final VoidCallback? onRunScan;
   final VoidCallback? onRefresh;
+  final VoidCallback onNetworkControls;
 
   @override
   Widget build(BuildContext context) {
@@ -444,6 +454,24 @@ class _DesktopToolbar extends StatelessWidget {
                   ),
                 ),
               if (showTimestamp) const SizedBox(width: AppSpacing.sm),
+              IconButton(
+                tooltip: 'Network Controls',
+                onPressed: onNetworkControls,
+                icon: const Icon(
+                  Icons.tune_rounded,
+                  size: AppSpacing.iconInline,
+                ),
+                style: IconButton.styleFrom(
+                  foregroundColor: AppColors.onSurfaceVariant,
+                  hoverColor: AppColors.surfaceHigh,
+                  minimumSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadius.xsAll,
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xxs),
               IconButton(
                 tooltip: 'Refresh',
                 onPressed: onRefresh,
@@ -831,9 +859,13 @@ class _NetworkSnapshotCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.xs),
+          const SizedBox(height: AppSpacing.sm),
           for (var i = 0; i < rows.length; i++) ...[
-            if (i > 0) const Divider(height: 1, color: AppColors.outlineSubtle),
+            if (i > 0)
+              const Padding(
+                padding: EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                child: Divider(height: 1, color: AppColors.outlineSubtle),
+              ),
             _SnapshotRow(row: rows[i]),
           ],
         ],
@@ -870,29 +902,33 @@ class _SnapshotRowState extends State<_SnapshotRow> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.xs,
-          horizontal: AppSpacing.xxs,
+          vertical: AppSpacing.sm,
+          horizontal: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
           color: _hovered
-              ? AppColors.surfaceHigh.withValues(alpha: 0.45)
+              ? AppColors.surfaceHigh.withValues(alpha: 0.35)
               : Colors.transparent,
           borderRadius: AppRadius.xsAll,
         ),
         child: Row(
           children: [
             Icon(row.icon, size: AppSpacing.iconInline, color: accent),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpacing.md),
             SizedBox(
               width: 56,
               child: Text(
                 row.title,
-                style: text.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: text.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.15,
+                ),
               ),
             ),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 row.summary,
@@ -905,7 +941,7 @@ class _SnapshotRowState extends State<_SnapshotRow> {
                 ),
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpacing.md),
             Flexible(
               child: Text(
                 row.explanation,
@@ -914,6 +950,7 @@ class _SnapshotRowState extends State<_SnapshotRow> {
                 textAlign: TextAlign.right,
                 style: text.labelSmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),
@@ -1178,11 +1215,11 @@ class _ServiceTileState extends State<_ServiceTile> {
         ),
         decoration: BoxDecoration(
           color: _hovered
-              ? AppColors.surfaceHigh.withValues(alpha: 0.7)
-              : AppColors.surfaceLow.withValues(alpha: 0.65),
+              ? AppColors.surfaceHigh.withValues(alpha: 0.55)
+              : AppColors.surfaceLow.withValues(alpha: 0.45),
           borderRadius: AppRadius.smAll,
           border: Border.all(
-            color: _hovered ? AppColors.outline : AppColors.outlineSubtle,
+            color: _hovered ? AppColors.outline : AppColors.borderSoft,
           ),
         ),
         child: Column(

@@ -6,7 +6,7 @@ import '../tokens/app_shadows.dart';
 import '../tokens/app_spacing.dart';
 import '../tokens/app_typography.dart';
 
-/// Filled primary action button with light hover feedback.
+/// Filled primary action with premium hover lift and ambient shadow.
 class PrimaryButton extends StatefulWidget {
   const PrimaryButton({
     super.key,
@@ -46,35 +46,39 @@ class _PrimaryButtonState extends State<PrimaryButton> {
     return MouseRegion(
       onEnter: enabled ? (_) => setState(() => _hovered = true) : null,
       onExit: enabled ? (_) => setState(() => _hovered = false) : null,
-      child: AnimatedScale(
-        scale: enabled && _hovered ? 1.015 : 1,
-        duration: const Duration(milliseconds: 160),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            borderRadius: AppRadius.mdAll,
-            boxShadow: enabled
-                ? (_hovered ? AppShadows.primaryGlow : AppShadows.sm)
-                : AppShadows.none,
-          ),
-          child: FilledButton(
-            onPressed: widget.onPressed,
-            style: FilledButton.styleFrom(
-              elevation: 0,
-              backgroundColor: AppColors.primary,
-              foregroundColor: AppColors.onPrimary,
-              disabledBackgroundColor: AppColors.surfaceHighest,
-              disabledForegroundColor: AppColors.onSurfaceMuted,
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.buttonPaddingH,
-                vertical: AppSpacing.buttonPaddingV,
-              ),
-              minimumSize: const Size(64, 36),
-              shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
-              textStyle: AppTypography.textTheme.labelLarge,
+        transform: Matrix4.translationValues(
+          0,
+          enabled && _hovered ? -1.5 : 0,
+          0,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: AppRadius.mdAll,
+          boxShadow: enabled
+              ? (_hovered ? AppShadows.primaryGlowHover : AppShadows.primaryGlow)
+              : AppShadows.none,
+        ),
+        child: FilledButton(
+          onPressed: widget.onPressed,
+          style: FilledButton.styleFrom(
+            elevation: 0,
+            backgroundColor: enabled && _hovered
+                ? const Color(0xFF959CFF)
+                : AppColors.primary,
+            foregroundColor: AppColors.onPrimary,
+            disabledBackgroundColor: AppColors.surfaceHighest,
+            disabledForegroundColor: AppColors.onSurfaceMuted,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpacing.buttonPaddingH,
+              vertical: AppSpacing.buttonPaddingV,
             ),
-            child: child,
+            minimumSize: const Size(64, 36),
+            shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
+            textStyle: AppTypography.textTheme.labelLarge,
           ),
+          child: child,
         ),
       ),
     );

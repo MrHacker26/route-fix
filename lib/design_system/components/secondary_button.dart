@@ -5,7 +5,7 @@ import '../tokens/app_radius.dart';
 import '../tokens/app_spacing.dart';
 import '../tokens/app_typography.dart';
 
-/// Outlined secondary action button with light hover feedback.
+/// Outlined secondary action with quiet hover feedback.
 class SecondaryButton extends StatefulWidget {
   const SecondaryButton({
     super.key,
@@ -45,10 +45,14 @@ class _SecondaryButtonState extends State<SecondaryButton> {
     return MouseRegion(
       onEnter: enabled ? (_) => setState(() => _hovered = true) : null,
       onExit: enabled ? (_) => setState(() => _hovered = false) : null,
-      child: AnimatedScale(
-        scale: enabled && _hovered ? 1.012 : 1,
-        duration: const Duration(milliseconds: 160),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
+        transform: Matrix4.translationValues(
+          0,
+          enabled && _hovered ? -1 : 0,
+          0,
+        ),
         child: OutlinedButton(
           onPressed: widget.onPressed,
           style: OutlinedButton.styleFrom(
@@ -56,8 +60,8 @@ class _SecondaryButtonState extends State<SecondaryButton> {
             foregroundColor: AppColors.onSurface,
             disabledForegroundColor: AppColors.onSurfaceMuted,
             backgroundColor: _hovered && enabled
-                ? AppColors.surfaceHighest.withValues(alpha: 0.55)
-                : AppColors.surfaceHigh.withValues(alpha: 0.4),
+                ? AppColors.surfaceHighest.withValues(alpha: 0.45)
+                : AppColors.surfaceHigh.withValues(alpha: 0.28),
             padding: const EdgeInsets.symmetric(
               horizontal: AppSpacing.buttonPaddingH,
               vertical: AppSpacing.buttonPaddingV,
@@ -65,7 +69,7 @@ class _SecondaryButtonState extends State<SecondaryButton> {
             minimumSize: const Size(64, 36),
             side: BorderSide(
               color: enabled
-                  ? (_hovered ? AppColors.outline : AppColors.outlineSubtle)
+                  ? (_hovered ? AppColors.outline : AppColors.borderSoft)
                   : AppColors.outlineSubtle,
             ),
             shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),

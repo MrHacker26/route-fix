@@ -89,21 +89,22 @@ abstract final class AppTypography {
           height: 1.45,
           color: AppColors.onSurfaceVariant,
         ),
+        labelSmall: _base.copyWith(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.08,
+          color: AppColors.onSurfaceMuted,
+        ),
+        labelMedium: _base.copyWith(
+          fontSize: 12,
+          fontWeight: FontWeight.w500,
+          letterSpacing: 0.12,
+          color: AppColors.onSurfaceMuted,
+        ),
         labelLarge: _base.copyWith(
           fontSize: 14,
           fontWeight: FontWeight.w600,
           letterSpacing: -0.05,
-        ),
-        labelMedium: _base.copyWith(
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-          letterSpacing: 0,
-        ),
-        labelSmall: _base.copyWith(
-          fontSize: 12,
-          fontWeight: FontWeight.w500,
-          letterSpacing: 0.05,
-          color: AppColors.onSurfaceVariant,
         ),
       );
 }

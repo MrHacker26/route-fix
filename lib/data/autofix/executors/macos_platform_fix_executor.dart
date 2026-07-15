@@ -4,17 +4,24 @@ import '../../../domain/autofix/models/fix_result.dart';
 import '../../../domain/autofix/models/fix_type.dart';
 import '../../../domain/autofix/platform_fix_executor.dart';
 import '../../../domain/autofix/shell_command_executor.dart';
+import 'macos_privileged_networksetup.dart';
 
-/// macOS Auto Fix executor using `networksetup` (argv only).
+/// macOS Auto Fix executor using privileged `networksetup` via AppleScript.
 ///
 /// Prefer IPv4 → `networksetup -setv6off <service>`
 /// Restore → `networksetup -setv6automatic <service>`
+///
+/// Mutations are elevated with:
+/// `do shell script "…" with administrator privileges`
 final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
   MacOsPlatformFixExecutor({
     required ShellCommandExecutor shell,
-  }) : _shell = shell;
+    MacOsPrivilegedNetworksetup? privileged,
+  })  : _shell = shell,
+        _privileged = privileged ?? MacOsPrivilegedNetworksetup(shell: shell);
 
   final ShellCommandExecutor _shell;
+  final MacOsPrivilegedNetworksetup _privileged;
 
   @override
   FixPlatform get platform => FixPlatform.macOS;
@@ -53,70 +60,104 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
     }
 
     final applied = <String>[];
-    final skipped = <String>[];
-    final commands = <String>[];
-    final stdoutParts = <String>[];
-    final stderrParts = <String>[];
+    final commands = <String>[
+      for (final service in services) 'networksetup $flag $service',
+    ];
 
     for (final service in services) {
       _validateServiceName(service);
-      final args = [flag, service];
-      commands.add('networksetup ${args.join(' ')}');
-
-      late final ShellCommandResult result;
-      try {
-        result = await _shell.run('networksetup', args);
-      } on AutoFixException catch (error) {
-        return FixResult.failure(
-          kind,
-          message: 'Could not $verb this network.',
-          error: error.message,
-          executed: false,
-          platform: platform,
-          metadata: {
-            'command': 'networksetup ${args.join(' ')}',
-            if (error.details != null) 'details': error.details!,
-          },
-        );
-      }
-
-      if (result.stdout.isNotEmpty) stdoutParts.add(result.stdout);
-      if (result.stderr.isNotEmpty) stderrParts.add(result.stderr);
-
-      if (!result.isSuccess) {
-        final detail = result.stderr.isNotEmpty
-            ? result.stderr
-            : (result.stdout.isNotEmpty
-                ? result.stdout
-                : 'exit code ${result.exitCode}');
-        skipped.add('$service ($detail)');
-        continue;
-      }
-      applied.add(service);
     }
 
-    if (applied.isEmpty) {
-      final errorText = skipped.isEmpty
-          ? 'No network services were updated.'
-          : skipped.join('; ');
-      final permission = errorText.toLowerCase().contains('permission') ||
-          errorText.toLowerCase().contains('not permitted');
+    late final MacOsPrivilegedCommandResult result;
+    try {
+      // One AppleScript → one native admin dialog for all services.
+      result = await _privileged.runForServices(
+        flag: flag,
+        services: services,
+      );
+    } on ArgumentError catch (error) {
       return FixResult.failure(
         kind,
-        message: permission
-            ? 'RouteFix needs administrator permission to continue.'
-            : 'Could not $verb this network.',
-        error: errorText,
+        message: 'Could not $verb this network.',
+        error: error.message,
+        executed: false,
         platform: platform,
-        requiresElevation: permission,
+        metadata: {'commands': commands.join('; ')},
+      );
+    } on AutoFixException catch (error) {
+      return FixResult.failure(
+        kind,
+        message: 'Could not $verb this network.',
+        error: error.message,
+        executed: false,
+        platform: platform,
         metadata: {
           'commands': commands.join('; '),
-          'services': services.join(', '),
-          if (stdoutParts.isNotEmpty) 'stdout': stdoutParts.join('\n'),
-          if (stderrParts.isNotEmpty) 'stderr': stderrParts.join('\n'),
+          if (error.details != null) 'details': error.details!,
         },
       );
     }
+
+    if (result.isCancelled) {
+      return FixResult.cancelled(
+        kind,
+        platform: platform,
+        executedCommand: result.executedCommand,
+        metadata: {
+          'commands': commands.join('; '),
+          'shellCommand': result.shellCommand,
+          if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+          if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+          'exitCode': '${result.exitCode}',
+        },
+      );
+    }
+
+    if (result.outcome == MacOsPrivilegedOutcome.authFailed) {
+      return FixResult.failure(
+        kind,
+        message: MacOsPrivilegedNetworksetup.authFailureMessage(result.stderr),
+        error: result.stderr.isNotEmpty
+            ? result.stderr
+            : 'Administrator authentication failed.',
+        platform: platform,
+        requiresElevation: true,
+        executedCommand: result.executedCommand,
+        metadata: {
+          'commands': commands.join('; '),
+          'shellCommand': result.shellCommand,
+          if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+          if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+          'exitCode': '${result.exitCode}',
+          'outcome': 'AuthFailed',
+        },
+      );
+    }
+
+    if (!result.isSuccess) {
+      return FixResult.failure(
+        kind,
+        message: 'Could not $verb this network.',
+        error: result.stderr.isNotEmpty
+            ? result.stderr
+            : (result.stdout.isNotEmpty
+                ? result.stdout
+                : 'exit code ${result.exitCode}'),
+        platform: platform,
+        requiresElevation: true,
+        executedCommand: result.executedCommand,
+        metadata: {
+          'commands': commands.join('; '),
+          'services': services.join(', '),
+          'shellCommand': result.shellCommand,
+          if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+          if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+          'exitCode': '${result.exitCode}',
+        },
+      );
+    }
+
+    applied.addAll(services);
 
     return FixResult.success(
       kind,
@@ -124,13 +165,16 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
           ? 'Network defaults restored (${applied.join(', ')}).'
           : 'Prefer IPv4 applied (${applied.join(', ')}).',
       platform: platform,
+      requiresElevation: true,
+      executedCommand: result.executedCommand,
       metadata: {
         'commands': commands.join('; '),
         'applied': applied.join(', '),
-        if (skipped.isNotEmpty) 'skipped': skipped.join('; '),
         'mode': enabled ? 'automatic' : 'off',
-        if (stdoutParts.isNotEmpty) 'stdout': stdoutParts.join('\n'),
-        if (stderrParts.isNotEmpty) 'stderr': stderrParts.join('\n'),
+        'shellCommand': result.shellCommand,
+        if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+        if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+        'elevated': 'true',
       },
     );
   }

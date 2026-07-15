@@ -124,7 +124,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
   List<Widget> _staggered(List<Widget> children) {
     final widgets = <Widget>[];
     for (var i = 0; i < children.length; i++) {
-      if (i > 0) widgets.add(const SizedBox(height: AppSpacing.md));
+      if (i > 0) widgets.add(const SizedBox(height: AppSpacing.sectionGap));
       final start = (0.04 + i * 0.07).clamp(0.0, 0.7);
       final end = (start + 0.28).clamp(0.0, 1.0);
       widgets.add(
@@ -145,18 +145,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Color(0xFF12121A),
-              AppColors.background,
-              Color(0xFF0E0E14),
-            ],
-          ),
-        ),
+      body: PageAtmosphere(
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
@@ -592,7 +581,10 @@ class _NetworkSnapshotSection extends StatelessWidget {
             children: [
               for (var i = 0; i < metrics.length; i++) ...[
                 if (i > 0)
-                  const Divider(height: 1, color: AppColors.outlineSubtle),
+                  const Padding(
+                    padding: EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+                    child: Divider(height: 1, color: AppColors.outlineSubtle),
+                  ),
                 _MetricRow(metric: metrics[i]),
               ],
             ],
@@ -631,29 +623,33 @@ class _MetricRowState extends State<_MetricRow> {
       onEnter: (_) => setState(() => _hovered = true),
       onExit: (_) => setState(() => _hovered = false),
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 160),
+        duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
         padding: const EdgeInsets.symmetric(
-          vertical: AppSpacing.xs,
-          horizontal: AppSpacing.xxs,
+          vertical: AppSpacing.sm,
+          horizontal: AppSpacing.xs,
         ),
         decoration: BoxDecoration(
           color: _hovered
-              ? AppColors.surfaceHigh.withValues(alpha: 0.45)
+              ? AppColors.surfaceHigh.withValues(alpha: 0.35)
               : Colors.transparent,
           borderRadius: AppRadius.xsAll,
         ),
         child: Row(
           children: [
             Icon(metric.icon, size: AppSpacing.iconInline, color: accent),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpacing.md),
             SizedBox(
               width: 56,
               child: Text(
                 metric.title,
-                style: text.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                style: text.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.15,
+                ),
               ),
             ),
+            const SizedBox(width: AppSpacing.sm),
             Expanded(
               child: Text(
                 metric.value,
@@ -666,7 +662,7 @@ class _MetricRowState extends State<_MetricRow> {
                 ),
               ),
             ),
-            const SizedBox(width: AppSpacing.sm),
+            const SizedBox(width: AppSpacing.md),
             Flexible(
               child: Text(
                 metric.detail,
@@ -675,6 +671,7 @@ class _MetricRowState extends State<_MetricRow> {
                 textAlign: TextAlign.right,
                 style: text.labelSmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
+                  fontWeight: FontWeight.w400,
                 ),
               ),
             ),

@@ -73,6 +73,15 @@ class _RestoreDefaultCardState extends State<RestoreDefaultCard> {
 
     if (!mounted) return;
 
+    if (result.wasCancelled) {
+      setState(() {
+        _loading = false;
+        _failureMessage = null;
+        _failureTechnical = null;
+      });
+      return;
+    }
+
     if (result.success) {
       setState(() {
         _loading = false;

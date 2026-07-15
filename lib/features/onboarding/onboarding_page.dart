@@ -56,19 +56,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
 
     return Scaffold(
       backgroundColor: AppColors.background,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              AppColors.background,
-              AppColors.atmosphere,
-              AppColors.background,
-            ],
-            stops: [0.0, 0.45, 1.0],
-          ),
-        ),
+      body: PageAtmosphere(
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
