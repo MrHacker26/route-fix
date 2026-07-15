@@ -3,6 +3,8 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 
 /// Static product metadata for About / Settings.
+///
+/// Keep [version] / [build] aligned with `pubspec.yaml` (`version: x.y.z+build`).
 abstract final class AppInfo {
   static const String name = 'RouteFix';
   static const String version = '1.0.0';

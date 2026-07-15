@@ -1,1 +1,6 @@
 blank_issues_enabled: false
+contact_links:
+  - name: Security advisory
+    url: https://github.com/MrHacker26/route-fix/security/advisories/new
+    about: Report a vulnerability privately (see SECURITY.md).
+

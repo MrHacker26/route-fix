@@ -2,42 +2,24 @@
 
 RouteFix is a desktop application that diagnoses network routing issues.
 
-This is NOT a speed test.
+This is **not** a speed test.
 
-It helps users understand why services like GitHub, PyPI, Docker or APIs may be slow even when bandwidth is high.
+It helps developers understand why services like GitHub, PyPI, Docker, or APIs
+may feel slow even when bandwidth looks fine.
 
-The design language is inspired by:
+## Product direction
 
-- Linear
-- Raycast
-- Arc Browser
-- Apple Settings
+- Flutter Desktop (macOS, Windows, Linux)
+- Dark mode, Material 3
+- Developer-first UX (calm, precise, evidence-backed)
 
-Target:
+Design references: Linear, Raycast, Arc Browser, Apple Settings.
 
-Flutter Desktop
-
-Dark Mode
-
-Material 3
-
-Developer-first.
-
-We value:
-
-- Premium UI
-- Simple UX
-- Accurate diagnosis
-- Calm animations
-- Beautiful typography
-
-Never generate code outside the requested task.
-
-## Engineering Rules
+## Engineering rules
 
 - Never infer recommendations from generic failures.
 - Every recommendation must cite evidence.
 - Every latency label must describe what is actually measured.
 - Never display mocked values in production.
 - Prefer "Unknown" over an incorrect diagnosis.
-- It is better to return "Insufficient evidence" than a wrong fix.
+- Prefer "Insufficient evidence" over a wrong fix.

@@ -9,12 +9,12 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/MrHacker26/route-fix/actions/workflows/ci.yml"><img src="https://github.com/MrHacker26/route-fix/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-Desktop-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter Desktop"></a>
   <img src="https://img.shields.io/badge/target-Desktop-111827?style=flat-square" alt="Desktop target">
   <img src="https://img.shields.io/badge/Dart-3.12%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License"></a>
-  <a href="https://github.com/MrHacker26/route-fix/stargazers"><img src="https://img.shields.io/github/stars/MrHacker26/route-fix?style=flat-square" alt="Stars"></a>
-  <a href="https://github.com/MrHacker26/route-fix/issues"><img src="https://img.shields.io/github/issues/MrHacker26/route-fix?style=flat-square" alt="Issues"></a>
+  <a href="https://github.com/MrHacker26/route-fix/releases"><img src="https://img.shields.io/github/v/release/MrHacker26/route-fix?style=flat-square&include_prereleases&label=release" alt="Release"></a>
 </p>
 
 <p align="center">
@@ -111,17 +111,27 @@ Status values reflect **actual verification**, not intended support.
 
 ## Installation
 
-Prebuilt installers are not published yet. Build from source below.
+### Prebuilt binaries
 
-**Requirements**
+Download the latest desktop build from
+[GitHub Releases](https://github.com/MrHacker26/route-fix/releases)
+(published automatically when a `v*` tag is pushed).
+
+| Asset | Platform |
+|-------|----------|
+| `RouteFix-vX.Y.Z-macos.zip` | macOS (`.app` inside) |
+| `RouteFix-vX.Y.Z-windows.zip` | Windows |
+| `RouteFix-vX.Y.Z-linux.tar.gz` | Linux bundle |
+
+If no release exists yet, build from source below.
+
+### Requirements (from source)
 
 - [Flutter](https://docs.flutter.dev/get-started/install) (stable) with desktop support enabled
 - Dart SDK **3.12+**
 - macOS, Windows, or Linux
 
----
-
-## Build from source
+### Build from source
 
 ```bash
 git clone https://github.com/MrHacker26/route-fix.git
@@ -140,9 +150,9 @@ flutter run -d linux    # Linux
 Release builds:
 
 ```bash
-flutter build macos
-flutter build windows
-flutter build linux
+flutter build macos --release
+flutter build windows --release
+flutter build linux --release
 ```
 
 On macOS, Auto Fix needs a real administrator prompt (the app is not App Sandboxed for elevated `networksetup`).
@@ -167,7 +177,7 @@ On macOS, Auto Fix needs a real administrator prompt (the app is not App Sandbox
 
 ```
 lib/
-  features/       UI — dashboard, diagnostics, network controls
+  features/       UI — dashboard, diagnostics, network controls, settings
   application/    Diagnostics coordinator
   domain/         Models, diagnosis engine & rules, Auto Fix ports
   data/           dart:io probes, platform fix executors
@@ -184,6 +194,23 @@ UI  →  AutoFixService  →  PlatformFixExecutor (macOS | Linux | Windows)
 ```
 
 Recommendations must cite evidence. Production UI does not display mocked metrics.
+
+---
+
+## Versioning & releases
+
+- App version lives in `pubspec.yaml` (`MAJOR.MINOR.PATCH+BUILD`) and should match `lib/core/app_info.dart`
+- Human-readable history: [`CHANGELOG.md`](CHANGELOG.md)
+- Publish a GitHub Release by tagging SemVer with a `v` prefix:
+
+```bash
+# After updating pubspec.yaml, AppInfo, and CHANGELOG.md
+git tag v1.0.0
+git push origin v1.0.0
+```
+
+The [Release](.github/workflows/release.yml) workflow builds macOS / Windows / Linux,
+attaches binaries, and generates release notes.
 
 ---
 
@@ -215,9 +242,11 @@ Contributions are welcome.
 2. Keep diagnosis honest — prefer **Unknown** / insufficient evidence over a wrong fix
 3. Do not invent metrics or recommendations without cited probe evidence
 4. Match existing structure (`domain` / `data` / `features`) and naming
-5. Open a pull request with a short summary and how you tested
+5. Open a pull request using the PR template; note how you tested
+6. Update [`CHANGELOG.md`](CHANGELOG.md) under **Unreleased** for user-facing changes
 
-Engineering principles are also noted in [`PROJECT.md`](PROJECT.md).
+Engineering principles: [`PROJECT.md`](PROJECT.md).  
+Security reports: [`SECURITY.md`](SECURITY.md) (private advisory preferred).
 
 ---
 
