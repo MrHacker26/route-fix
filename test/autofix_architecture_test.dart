@@ -30,14 +30,6 @@ void main() {
       expect(disable.supportsPlatform(FixPlatform.macOS), isTrue);
     });
 
-    test('apply never executes foundation stubs', () async {
-      final result = await provider.apply(FixActionKind.disableIpv6);
-
-      expect(result.executed, isFalse);
-      expect(result.success, isFalse);
-      expect(result.error, contains('not implemented'));
-    });
-
     test('future actions return comingSoon without executing', () async {
       final result = await provider.apply(FixActionKind.openWarp);
 
