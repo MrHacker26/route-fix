@@ -1,0 +1,70 @@
+# RouteFix Release — build desktop binaries from a version tag and publish a GitHub Release.
+#
+# Create a release:
+#   git tag v1.0.0
+#   git push origin v1.0.0
+#
+# Uses the shared build-desktop workflow (no duplicated build logic).
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+# Never cancel an in-flight release publish for the same tag.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build-desktop.yml
+    with:
+      run_quality_checks: true
+      # Short retention: binaries are attached to the GitHub Release.
+      artifact_retention_days: 7
+      version: ${{ github.ref_name }}
+
+  release:
+    name: Publish GitHub Release
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          # Full history helps GitHub generate accurate release notes.
+          fetch-depth: 0
+          fetch-tags: true
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: RouteFix-*
+          path: release-assets
+          merge-multiple: true
+
+      - name: List release assets
+        run: ls -lah release-assets
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: RouteFix ${{ github.ref_name }}
+          draft: false
+          # Treat tags with a hyphen suffix as prereleases (e.g. v1.0.0-rc.1).
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/*
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

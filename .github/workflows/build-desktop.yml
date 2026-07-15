@@ -1,0 +1,143 @@
+# Shared desktop build — called by CI and Release. Do not trigger directly.
+name: Build desktop
+
+on:
+  workflow_call:
+    inputs:
+      # Analyze + test before packaging (recommended for CI and releases).
+      run_quality_checks:
+        description: Run flutter analyze and flutter test
+        type: boolean
+        required: false
+        default: true
+      artifact_retention_days:
+        description: How long workflow artifacts are retained
+        type: number
+        required: false
+        default: 14
+      # When set (e.g. v1.2.3), packages are named RouteFix-<version>-<platform>.*
+      version:
+        description: Optional version label for packaged filenames
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            name: macOS
+            artifact: macos
+          - os: ubuntu-latest
+            name: Linux
+            artifact: linux
+          - os: windows-latest
+            name: Windows
+            artifact: windows
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Linux desktop dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -y
+          sudo apt-get install -y \
+            clang \
+            cmake \
+            ninja-build \
+            pkg-config \
+            libgtk-3-dev \
+            liblzma-dev \
+            libstdc++-12-dev
+
+      - name: Set up Flutter (stable)
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+          pub-cache: true
+
+      - name: Flutter doctor
+        run: flutter doctor -v
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze
+        if: inputs.run_quality_checks
+        run: flutter analyze --fatal-warnings
+
+      - name: Test
+        if: inputs.run_quality_checks
+        shell: bash
+        run: |
+          if [ -d test ] && find test -name '*.dart' -print -quit | grep -q .; then
+            flutter test --reporter expanded
+          else
+            echo "No Dart tests found under test/ — skipping."
+          fi
+
+      - name: Resolve package basename
+        id: pkg
+        shell: bash
+        run: |
+          if [ -n "${{ inputs.version }}" ]; then
+            echo "basename=RouteFix-${{ inputs.version }}-${{ matrix.artifact }}" >> "$GITHUB_OUTPUT"
+          else
+            echo "basename=RouteFix-${{ matrix.artifact }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Build macOS
+        if: runner.os == 'macOS'
+        run: flutter build macos --release
+
+      - name: Package macOS
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dist
+          ditto -c -k --sequesterRsrc --keepParent \
+            build/macos/Build/Products/Release/RouteFix.app \
+            "dist/${{ steps.pkg.outputs.basename }}.zip"
+
+      - name: Build Linux
+        if: runner.os == 'Linux'
+        run: flutter build linux --release
+
+      - name: Package Linux
+        if: runner.os == 'Linux'
+        run: |
+          mkdir -p dist
+          tar -C build/linux/x64/release -czf \
+            "dist/${{ steps.pkg.outputs.basename }}.tar.gz" bundle
+
+      - name: Build Windows
+        if: runner.os == 'Windows'
+        run: flutter build windows --release
+
+      - name: Package Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path dist | Out-Null
+          Compress-Archive -Path build/windows/x64/runner/Release/* `
+            -DestinationPath "dist/${{ steps.pkg.outputs.basename }}.zip" -Force
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: RouteFix-${{ matrix.artifact }}
+          path: dist/*
+          if-no-files-found: error
+          retention-days: ${{ inputs.artifact_retention_days }}

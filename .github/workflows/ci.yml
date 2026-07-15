@@ -1,0 +1,24 @@
+# RouteFix CI — quality checks + desktop builds via shared reusable workflow.
+name: CI
+
+on:
+  push:
+    # Tag pushes are handled by release.yml (avoids duplicate builds).
+    branches:
+      - '**'
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build
+    uses: ./.github/workflows/build-desktop.yml
+    with:
+      run_quality_checks: true
+      artifact_retention_days: 14

@@ -254,7 +254,7 @@ final class DiagnosticsResultViewData {
         final formatted = ratio >= 2
             ? ratio.round().toString()
             : ratio.toStringAsFixed(1);
-        return 'IPv6 is slower than IPv4 right now.';
+        return 'IPv6 is about $formatted× slower than IPv4 right now.';
       }
     }
 

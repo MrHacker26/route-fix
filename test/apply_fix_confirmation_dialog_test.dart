@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:route_fix/design_system/design_system.dart';
 import 'package:route_fix/domain/autofix/autofix.dart';
-import 'package:route_fix/features/diagnostics/apply_fix_confirmation_dialog.dart';
 import 'package:route_fix/features/diagnostics/diagnostics_result_view_data.dart';
 import 'package:route_fix/features/diagnostics/recommended_fix_card.dart';
 
