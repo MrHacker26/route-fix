@@ -8,11 +8,16 @@ import '../../../domain/models/probe_timings.dart';
 import '../../../domain/services/ipv6_connectivity_service.dart';
 import '../probe_failure_mapper.dart';
 
-/// IPv6 reachability via explicit DNS then TCP stages (`dart:io`).
+/// IPv6 reachability via native AAAA records then TCP (`dart:io`).
+///
+/// Never connects to IPv4-mapped IPv6 addresses (`::ffff:x.x.x.x`).
+/// IPv4 and IPv6 paths stay independent.
 class DartIoIpv6ConnectivityService implements Ipv6ConnectivityService {
   const DartIoIpv6ConnectivityService({
     this.timeout = const Duration(seconds: 8),
   });
+
+  static const noIpv6Advertised = 'No IPv6 address advertised by target.';
 
   final Duration timeout;
 
@@ -46,9 +51,8 @@ class DartIoIpv6ConnectivityService implements Ipv6ConnectivityService {
         type: InternetAddressType.IPv6,
       ).timeout(timeout);
 
-      final ipv6 = addresses
-          .where((item) => item.type == InternetAddressType.IPv6)
-          .toList(growable: false);
+      // Native AAAA only — never IPv4-mapped (::ffff:…) fabrications.
+      final ipv6 = addresses.where(isNativeIpv6Address).toList(growable: false);
 
       dnsWatch.stop();
       timings = timings.copyWith(dns: dnsWatch.elapsed);
@@ -58,7 +62,7 @@ class DartIoIpv6ConnectivityService implements Ipv6ConnectivityService {
           success: false,
           latency: timings.dns,
           stageFailed: ProbeStage.dns,
-          failure: DNSFailure('No IPv6 address found for "$host"'),
+          failure: const DNSFailure(noIpv6Advertised),
           timings: timings,
         );
       }
@@ -161,4 +165,35 @@ class DartIoIpv6ConnectivityService implements Ipv6ConnectivityService {
       await socket?.close();
     }
   }
+}
+
+/// True only for real IPv6 addresses — rejects IPv4-mapped `::ffff:a.b.c.d`.
+bool isNativeIpv6Address(InternetAddress address) {
+  if (address.type != InternetAddressType.IPv6) {
+    return false;
+  }
+
+  final raw = address.rawAddress;
+  if (raw.length != 16) {
+    return false;
+  }
+
+  // IPv4-mapped IPv6 layout: 80 bits zero + 16 bits ones + 32-bit IPv4.
+  var leadingZero = true;
+  for (var i = 0; i < 10; i++) {
+    if (raw[i] != 0) {
+      leadingZero = false;
+      break;
+    }
+  }
+  if (leadingZero && raw[10] == 0xff && raw[11] == 0xff) {
+    return false;
+  }
+
+  final textual = address.address.toLowerCase();
+  if (textual.startsWith('::ffff:')) {
+    return false;
+  }
+
+  return true;
 }
