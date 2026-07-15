@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
 import '../../design_system/design_system.dart';
+import '../diagnostics/diagnostics_page.dart';
 import 'dashboard_mock_data.dart';
 
 /// Premium network health report — mock data only.
@@ -145,7 +146,27 @@ class _DashboardPageState extends State<DashboardPage>
                               label: 'Start Diagnosis',
                               icon: Icons.radar_rounded,
                               expanded: true,
-                              onPressed: widget.onStartDiagnosis ?? () {},
+                              onPressed: widget.onStartDiagnosis ??
+                                  () {
+                                    Navigator.of(context).push(
+                                      PageRouteBuilder<void>(
+                                        transitionDuration: const Duration(
+                                          milliseconds: 420,
+                                        ),
+                                        reverseTransitionDuration:
+                                            const Duration(milliseconds: 320),
+                                        pageBuilder: (_, animation, secondary) {
+                                          return FadeTransition(
+                                            opacity: CurvedAnimation(
+                                              parent: animation,
+                                              curve: Curves.easeOutCubic,
+                                            ),
+                                            child: const DiagnosticsPage(),
+                                          );
+                                        },
+                                      ),
+                                    );
+                                  },
                             ),
                           ),
                         ),
