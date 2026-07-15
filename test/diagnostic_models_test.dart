@@ -30,12 +30,14 @@ void main() {
         checkedAt: checkedAt,
         metrics: const {'github_ms': 132},
       ),
+      confidence: 0.88,
       issues: const [issue],
       recommendations: const [recommendation],
       duration: const Duration(seconds: 18),
     );
 
     expect(report.health.score, 74);
+    expect(report.confidence, 0.88);
     expect(report.issues.single.severity, DiagnosticSeverity.medium);
     expect(report.recommendations.single.relatedIssueIds, ['gh-latency']);
     expect(
@@ -50,6 +52,7 @@ void main() {
           checkedAt: checkedAt,
           metrics: const {'github_ms': 132},
         ),
+        confidence: 0.88,
         issues: const [issue],
         recommendations: const [recommendation],
         duration: const Duration(seconds: 18),

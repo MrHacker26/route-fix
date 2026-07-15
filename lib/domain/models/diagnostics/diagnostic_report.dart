@@ -8,6 +8,7 @@ final class DiagnosticReport {
     required this.id,
     required this.createdAt,
     required this.health,
+    required this.confidence,
     this.issues = const [],
     this.recommendations = const [],
     this.duration,
@@ -17,6 +18,10 @@ final class DiagnosticReport {
   final String id;
   final DateTime createdAt;
   final NetworkHealth health;
+
+  /// Aggregate confidence across evaluated rules (0.0–1.0).
+  final double confidence;
+
   final List<DiagnosticIssue> issues;
   final List<Recommendation> recommendations;
   final Duration? duration;
@@ -30,6 +35,7 @@ final class DiagnosticReport {
         other.id == id &&
         other.createdAt == createdAt &&
         other.health == health &&
+        other.confidence == confidence &&
         _listEquals(other.issues, issues) &&
         _listEquals(other.recommendations, recommendations) &&
         other.duration == duration &&
@@ -41,6 +47,7 @@ final class DiagnosticReport {
         id,
         createdAt,
         health,
+        confidence,
         Object.hashAll(issues),
         Object.hashAll(recommendations),
         duration,
