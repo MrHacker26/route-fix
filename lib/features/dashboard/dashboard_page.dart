@@ -2,17 +2,21 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../application/diagnostics/diagnostics_coordinator.dart';
 import '../../design_system/design_system.dart';
+import '../../di/app_services.dart';
 import '../diagnostics/diagnostics_page.dart';
-import 'dashboard_mock_data.dart';
+import 'dashboard_view_data.dart';
 
-/// Premium network health report — mock data only.
+/// Premium network health report — powered by [DiagnosticsCoordinator].
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
     super.key,
+    this.coordinator,
     this.onStartDiagnosis,
   });
 
+  final DiagnosticsCoordinator? coordinator;
   final VoidCallback? onStartDiagnosis;
 
   @override
@@ -23,6 +27,13 @@ class _DashboardPageState extends State<DashboardPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entrance;
 
+  DashboardViewData? _data;
+  var _loading = true;
+  String? _error;
+
+  DiagnosticsCoordinator get _coordinator =>
+      widget.coordinator ?? AppServices.diagnostics;
+
   @override
   void initState() {
     super.initState();
@@ -30,6 +41,7 @@ class _DashboardPageState extends State<DashboardPage>
       vsync: this,
       duration: const Duration(milliseconds: 900),
     )..forward();
+    _load();
   }
 
   @override
@@ -38,9 +50,73 @@ class _DashboardPageState extends State<DashboardPage>
     super.dispose();
   }
 
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final report = await _coordinator.run();
+      if (!mounted) return;
+      setState(() {
+        _data = DashboardViewData.fromReport(report);
+        _loading = false;
+      });
+      _entrance
+        ..reset()
+        ..forward();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = _friendlyError(error);
+      });
+      _entrance
+        ..reset()
+        ..forward();
+    }
+  }
+
+  String _friendlyError(Object error) {
+    final message = error.toString();
+    if (message.contains('SocketException') ||
+        message.contains('Failed host lookup') ||
+        message.contains('Network is unreachable')) {
+      return 'Couldn’t reach the network. Check your connection and try again.';
+    }
+    if (message.contains('TimeoutException') || message.contains('timed out')) {
+      return 'The diagnostic run timed out. Please try again.';
+    }
+    return 'Something went wrong while running diagnostics. Please retry.';
+  }
+
+  void _openDiagnostics() {
+    if (widget.onStartDiagnosis != null) {
+      widget.onStartDiagnosis!();
+      return;
+    }
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 420),
+        reverseTransitionDuration: const Duration(milliseconds: 320),
+        pageBuilder: (context, animation, secondary) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: const DiagnosticsPage(),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
+    final data = _data;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -105,37 +181,78 @@ class _DashboardPageState extends State<DashboardPage>
                                   ],
                                 ),
                               ),
-                              const StatusBadge(
-                                label: 'Mock data',
-                                tone: StatusBadgeTone.neutral,
+                              StatusBadge(
+                                label: _loading
+                                    ? 'Scanning'
+                                    : _error != null
+                                        ? 'Error'
+                                        : 'Live',
+                                tone: _loading
+                                    ? StatusBadgeTone.info
+                                    : _error != null
+                                        ? StatusBadgeTone.error
+                                        : StatusBadgeTone.success,
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xxl),
-                        _FadeSlide(
-                          animation: _entrance,
-                          interval: const Interval(0.08, 0.5),
-                          child: const _HealthScoreSection(),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _FadeSlide(
-                          animation: _entrance,
-                          interval: const Interval(0.16, 0.58),
-                          child: const _ConnectionStatusSection(),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _FadeSlide(
-                          animation: _entrance,
-                          interval: const Interval(0.24, 0.66),
-                          child: const _QuickSummarySection(),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _FadeSlide(
-                          animation: _entrance,
-                          interval: const Interval(0.32, 0.74),
-                          child: const _RecentScanSection(),
-                        ),
+                        if (_loading) ...[
+                          const _LoadingSection(
+                            title: 'Overall health',
+                            message: 'Running diagnostic checks…',
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          const _LoadingSection(
+                            title: 'Connection status',
+                            message: 'Probing local paths…',
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          const _LoadingSection(
+                            title: 'Quick summary',
+                            message: 'Collecting service results…',
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          const _LoadingSection(
+                            title: 'Recent scan',
+                            message: 'Almost done…',
+                          ),
+                        ] else if (_error != null) ...[
+                          _FadeSlide(
+                            animation: _entrance,
+                            interval: const Interval(0.08, 0.55),
+                            child: _ErrorSection(
+                              message: _error!,
+                              onRetry: _load,
+                            ),
+                          ),
+                        ] else if (data != null) ...[
+                          _FadeSlide(
+                            animation: _entrance,
+                            interval: const Interval(0.08, 0.5),
+                            child: _HealthScoreSection(data: data),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _FadeSlide(
+                            animation: _entrance,
+                            interval: const Interval(0.16, 0.58),
+                            child: _ConnectionStatusSection(
+                              connection: data.connection,
+                            ),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _FadeSlide(
+                            animation: _entrance,
+                            interval: const Interval(0.24, 0.66),
+                            child: _QuickSummarySection(items: data.summary),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _FadeSlide(
+                            animation: _entrance,
+                            interval: const Interval(0.32, 0.74),
+                            child: _RecentScanSection(scan: data.recentScan),
+                          ),
+                        ],
                         const SizedBox(height: AppSpacing.xxl),
                         _FadeSlide(
                           animation: _entrance,
@@ -146,27 +263,7 @@ class _DashboardPageState extends State<DashboardPage>
                               label: 'Start Diagnosis',
                               icon: Icons.radar_rounded,
                               expanded: true,
-                              onPressed: widget.onStartDiagnosis ??
-                                  () {
-                                    Navigator.of(context).push(
-                                      PageRouteBuilder<void>(
-                                        transitionDuration: const Duration(
-                                          milliseconds: 420,
-                                        ),
-                                        reverseTransitionDuration:
-                                            const Duration(milliseconds: 320),
-                                        pageBuilder: (_, animation, secondary) {
-                                          return FadeTransition(
-                                            opacity: CurvedAnimation(
-                                              parent: animation,
-                                              curve: Curves.easeOutCubic,
-                                            ),
-                                            child: const DiagnosticsPage(),
-                                          );
-                                        },
-                                      ),
-                                    );
-                                  },
+                              onPressed: _loading ? null : _openDiagnostics,
                             ),
                           ),
                         ),
@@ -232,14 +329,109 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-class _HealthScoreSection extends StatelessWidget {
-  const _HealthScoreSection();
+class _LoadingSection extends StatelessWidget {
+  const _LoadingSection({
+    required this.title,
+    required this.message,
+  });
+
+  final String title;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-    const score = DashboardMockData.healthScore;
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          _SectionHeader(title: title),
+          const SizedBox(height: AppSpacing.lg),
+          Row(
+            children: [
+              const SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.2),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(
+                child: Text(
+                  message,
+                  style: text.bodyMedium?.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorSection extends StatelessWidget {
+  const _ErrorSection({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionHeader(
+            title: 'Unable to load health report',
+            trailing: StatusBadge(
+              label: 'Failed',
+              tone: StatusBadgeTone.error,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            message,
+            style: text.bodyMedium?.copyWith(
+              color: AppColors.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SecondaryButton(
+            label: 'Retry',
+            icon: Icons.refresh_rounded,
+            onPressed: onRetry,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _HealthScoreSection extends StatelessWidget {
+  const _HealthScoreSection({required this.data});
+
+  final DashboardViewData data;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    final score = data.healthScore;
     final progress = score / 100;
+    final barColor = switch (data.healthTone) {
+      StatusBadgeTone.success => AppColors.success,
+      StatusBadgeTone.warning => AppColors.warning,
+      StatusBadgeTone.error => AppColors.error,
+      _ => AppColors.primary,
+    };
 
     return GlassCard(
       child: Row(
@@ -253,16 +445,16 @@ class _HealthScoreSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _SectionHeader(
+                _SectionHeader(
                   title: 'Overall health',
                   trailing: StatusBadge(
-                    label: DashboardMockData.healthLabel,
-                    tone: StatusBadgeTone.success,
+                    label: data.healthLabel,
+                    tone: data.healthTone,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  DashboardMockData.healthDetail,
+                  data.healthDetail,
                   style: text.bodyMedium?.copyWith(
                     color: AppColors.onSurfaceVariant,
                     height: 1.5,
@@ -275,12 +467,12 @@ class _HealthScoreSection extends StatelessWidget {
                     value: progress,
                     minHeight: 6,
                     backgroundColor: AppColors.surfaceHighest,
-                    color: AppColors.success,
+                    color: barColor,
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Score out of 100 · based on last scan',
+                  'Score out of 100 · ${(data.confidence * 100).round()}% confidence',
                   style: text.labelSmall,
                 ),
               ],
@@ -386,12 +578,26 @@ class _RingPainter extends CustomPainter {
 }
 
 class _ConnectionStatusSection extends StatelessWidget {
-  const _ConnectionStatusSection();
+  const _ConnectionStatusSection({required this.connection});
+
+  final ConnectionStatusView connection;
 
   @override
   Widget build(BuildContext context) {
-    final data = DashboardMockData.connection;
+    final data = connection;
     final text = AppTypography.textTheme;
+    final iconColor = switch (data.tone) {
+      StatusBadgeTone.success => AppColors.success,
+      StatusBadgeTone.warning => AppColors.warning,
+      StatusBadgeTone.error => AppColors.error,
+      _ => AppColors.primary,
+    };
+    final iconBg = switch (data.tone) {
+      StatusBadgeTone.success => AppColors.successContainer,
+      StatusBadgeTone.warning => AppColors.warningContainer,
+      StatusBadgeTone.error => AppColors.errorContainer,
+      _ => AppColors.primaryContainer,
+    };
 
     return GlassCard(
       child: Column(
@@ -411,12 +617,12 @@ class _ConnectionStatusSection extends StatelessWidget {
                 width: 44,
                 height: 44,
                 decoration: BoxDecoration(
-                  color: AppColors.successContainer,
+                  color: iconBg,
                   borderRadius: AppRadius.mdAll,
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.wifi_rounded,
-                  color: AppColors.success,
+                  color: iconColor,
                   size: 22,
                 ),
               ),
@@ -477,12 +683,12 @@ class _ConnectionStatusSection extends StatelessWidget {
 }
 
 class _QuickSummarySection extends StatelessWidget {
-  const _QuickSummarySection();
+  const _QuickSummarySection({required this.items});
+
+  final List<SummaryItemView> items;
 
   @override
   Widget build(BuildContext context) {
-    final items = DashboardMockData.summary;
-
     return GlassCard(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -506,7 +712,7 @@ class _QuickSummarySection extends StatelessWidget {
 class _SummaryRow extends StatelessWidget {
   const _SummaryRow({required this.item});
 
-  final SummaryItemMock item;
+  final SummaryItemView item;
 
   @override
   Widget build(BuildContext context) {
@@ -542,11 +748,12 @@ class _SummaryRow extends StatelessWidget {
 }
 
 class _RecentScanSection extends StatelessWidget {
-  const _RecentScanSection();
+  const _RecentScanSection({required this.scan});
+
+  final RecentScanView scan;
 
   @override
   Widget build(BuildContext context) {
-    final scan = DashboardMockData.recentScan;
     final text = AppTypography.textTheme;
 
     return GlassCard(
@@ -556,7 +763,7 @@ class _RecentScanSection extends StatelessWidget {
           _SectionHeader(
             title: 'Recent scan',
             trailing: StatusBadge(
-              label: 'Needs review',
+              label: scan.badgeLabel,
               tone: scan.tone,
             ),
           ),

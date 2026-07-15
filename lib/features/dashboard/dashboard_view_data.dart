@@ -1,0 +1,222 @@
+import 'package:flutter/material.dart';
+
+import '../../design_system/design_system.dart';
+import '../../domain/models/diagnostics/diagnostic_report.dart';
+import '../../domain/models/diagnostics/diagnostic_severity.dart';
+
+/// Presentation model for the dashboard — mapped from [DiagnosticReport].
+final class DashboardViewData {
+  const DashboardViewData({
+    required this.healthScore,
+    required this.healthLabel,
+    required this.healthDetail,
+    required this.healthTone,
+    required this.connection,
+    required this.summary,
+    required this.recentScan,
+    required this.confidence,
+  });
+
+  final int healthScore;
+  final String healthLabel;
+  final String healthDetail;
+  final StatusBadgeTone healthTone;
+  final ConnectionStatusView connection;
+  final List<SummaryItemView> summary;
+  final RecentScanView recentScan;
+  final double confidence;
+
+  factory DashboardViewData.fromReport(DiagnosticReport report) {
+    final healthTone = _toneForScore(report.health.score);
+    final meta = report.metadata;
+
+    final ipv4Ok = meta['ipv4_success'] == 'true';
+    final hostname = meta['target_hostname'] ?? 'network';
+    final ipv4Address = meta['ipv4_address'] ?? '—';
+    final ipv4Latency = meta['ipv4_latency_ms'];
+    final cloudflareStatus = meta['cloudflare_http_status'] ?? '—';
+
+    final connection = ConnectionStatusView(
+      title: ipv4Ok ? 'Connected' : 'Connectivity issues',
+      subtitle: ipv4Ok
+          ? 'IPv4 reachable · $hostname'
+          : (meta['ipv4_error'] ?? 'Unable to confirm local path'),
+      tone: ipv4Ok ? StatusBadgeTone.success : StatusBadgeTone.warning,
+      badgeLabel: ipv4Ok ? 'Online' : 'Degraded',
+      details: [
+        ConnectionDetailView(label: 'Target', value: hostname),
+        ConnectionDetailView(label: 'IPv4', value: ipv4Address),
+        ConnectionDetailView(
+          label: 'CF HTTP',
+          value: cloudflareStatus,
+        ),
+      ],
+    );
+
+    final summary = <SummaryItemView>[];
+    if (report.issues.isEmpty) {
+      summary.addAll([
+        const SummaryItemView(
+          title: 'DNS & routing',
+          detail: 'No diagnosis rules failed on this run',
+          tone: StatusBadgeTone.success,
+          badge: 'Healthy',
+          icon: Icons.verified_outlined,
+        ),
+        SummaryItemView(
+          title: 'Confidence',
+          detail:
+              '${(report.confidence * 100).round()}% aggregate rule confidence',
+          tone: StatusBadgeTone.info,
+          badge: 'Stable',
+          icon: Icons.insights_outlined,
+        ),
+        SummaryItemView(
+          title: 'Cloudflare edge',
+          detail: ipv4Latency == null
+              ? 'Edge probe completed'
+              : 'IPv4 probe $ipv4Latency ms · CF status $cloudflareStatus',
+          tone: StatusBadgeTone.success,
+          badge: 'OK',
+          icon: Icons.cloud_outlined,
+        ),
+      ]);
+    } else {
+      for (final issue in report.issues.take(3)) {
+        summary.add(
+          SummaryItemView(
+            title: issue.title,
+            detail: issue.description,
+            tone: _toneForSeverity(issue.severity),
+            badge: issue.severity.name,
+            icon: _iconForIssue(issue.code ?? issue.id),
+          ),
+        );
+      }
+    }
+
+    final finding = report.issues.isEmpty
+        ? 'All clear · ${report.health.label}'
+        : report.issues.first.title;
+
+    final created = report.createdAt.toLocal();
+    final timestamp =
+        '${created.year}-${created.month.toString().padLeft(2, '0')}-${created.day.toString().padLeft(2, '0')} · '
+        '${created.hour.toString().padLeft(2, '0')}:${created.minute.toString().padLeft(2, '0')}';
+
+    final duration = report.duration;
+    final durationLabel = duration == null
+        ? '—'
+        : duration.inSeconds > 0
+            ? '${duration.inSeconds}s'
+            : '${duration.inMilliseconds}ms';
+
+    return DashboardViewData(
+      healthScore: report.health.score,
+      healthLabel: report.health.label,
+      healthDetail: report.health.summary ??
+          'Routing health based on the latest diagnostic run.',
+      healthTone: healthTone,
+      connection: connection,
+      summary: summary,
+      recentScan: RecentScanView(
+        title: 'Diagnostic run',
+        timestamp: timestamp,
+        duration: durationLabel,
+        targets: int.tryParse(meta['rules_evaluated'] ?? '') ?? 5,
+        finding: finding,
+        tone: report.issues.isEmpty
+            ? StatusBadgeTone.success
+            : StatusBadgeTone.warning,
+        badgeLabel: report.issues.isEmpty ? 'Clear' : 'Needs review',
+      ),
+      confidence: report.confidence,
+    );
+  }
+
+  static StatusBadgeTone _toneForScore(int score) {
+    if (score >= 75) return StatusBadgeTone.success;
+    if (score >= 55) return StatusBadgeTone.warning;
+    return StatusBadgeTone.error;
+  }
+
+  static StatusBadgeTone _toneForSeverity(DiagnosticSeverity severity) {
+    return switch (severity) {
+      DiagnosticSeverity.info => StatusBadgeTone.info,
+      DiagnosticSeverity.low => StatusBadgeTone.neutral,
+      DiagnosticSeverity.medium => StatusBadgeTone.warning,
+      DiagnosticSeverity.high || DiagnosticSeverity.critical =>
+        StatusBadgeTone.error,
+    };
+  }
+
+  static IconData _iconForIssue(String code) {
+    if (code.contains('dns')) return Icons.dns_outlined;
+    if (code.contains('ipv6')) return Icons.filter_6_rounded;
+    if (code.contains('github')) return Icons.code_outlined;
+    if (code.contains('pypi')) return Icons.inventory_2_outlined;
+    return Icons.warning_amber_rounded;
+  }
+}
+
+class ConnectionStatusView {
+  const ConnectionStatusView({
+    required this.title,
+    required this.subtitle,
+    required this.tone,
+    required this.badgeLabel,
+    required this.details,
+  });
+
+  final String title;
+  final String subtitle;
+  final StatusBadgeTone tone;
+  final String badgeLabel;
+  final List<ConnectionDetailView> details;
+}
+
+class ConnectionDetailView {
+  const ConnectionDetailView({
+    required this.label,
+    required this.value,
+  });
+
+  final String label;
+  final String value;
+}
+
+class SummaryItemView {
+  const SummaryItemView({
+    required this.title,
+    required this.detail,
+    required this.tone,
+    required this.badge,
+    required this.icon,
+  });
+
+  final String title;
+  final String detail;
+  final StatusBadgeTone tone;
+  final String badge;
+  final IconData icon;
+}
+
+class RecentScanView {
+  const RecentScanView({
+    required this.title,
+    required this.timestamp,
+    required this.duration,
+    required this.targets,
+    required this.finding,
+    required this.tone,
+    required this.badgeLabel,
+  });
+
+  final String title;
+  final String timestamp;
+  final String duration;
+  final int targets;
+  final String finding;
+  final StatusBadgeTone tone;
+  final String badgeLabel;
+}

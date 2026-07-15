@@ -1,2 +1,4 @@
-/// Dependency injection / composition root placeholders.
+/// Dependency injection / composition root.
 library;
+
+export 'app_services.dart';
