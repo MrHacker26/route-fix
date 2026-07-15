@@ -1,0 +1,115 @@
+import 'dart:async';
+import 'dart:io';
+
+import '../../../domain/models/ipv4_connectivity_result.dart';
+import '../../../domain/services/ipv4_connectivity_service.dart';
+
+/// IPv4 reachability via DNS lookup + TCP connect (`dart:io`).
+class DartIoIpv4ConnectivityService implements Ipv4ConnectivityService {
+  const DartIoIpv4ConnectivityService({
+    this.timeout = const Duration(seconds: 8),
+  });
+
+  final Duration timeout;
+
+  @override
+  Future<Ipv4ConnectivityResult> check(
+    String hostname, {
+    int port = 443,
+  }) async {
+    final host = hostname.trim();
+    if (host.isEmpty) {
+      return const Ipv4ConnectivityResult(
+        success: false,
+        error: 'Hostname must not be empty',
+      );
+    }
+
+    if (port < 1 || port > 65535) {
+      return const Ipv4ConnectivityResult(
+        success: false,
+        error: 'Port must be between 1 and 65535',
+      );
+    }
+
+    late final InternetAddress address;
+    try {
+      final addresses = await InternetAddress.lookup(
+        host,
+        type: InternetAddressType.IPv4,
+      ).timeout(timeout);
+
+      final ipv4 = addresses
+          .where((item) => item.type == InternetAddressType.IPv4)
+          .toList(growable: false);
+
+      if (ipv4.isEmpty) {
+        return Ipv4ConnectivityResult(
+          success: false,
+          error: 'No IPv4 address found for "$host"',
+        );
+      }
+
+      address = ipv4.first;
+    } on TimeoutException {
+      return const Ipv4ConnectivityResult(
+        success: false,
+        error: 'IPv4 DNS lookup timed out',
+      );
+    } on SocketException catch (error) {
+      return Ipv4ConnectivityResult(
+        success: false,
+        error: error.message.isEmpty ? 'IPv4 DNS lookup failed' : error.message,
+      );
+    } catch (error) {
+      return Ipv4ConnectivityResult(
+        success: false,
+        error: error.toString(),
+      );
+    }
+
+    final stopwatch = Stopwatch()..start();
+    Socket? socket;
+
+    try {
+      socket = await Socket.connect(
+        address,
+        port,
+        timeout: timeout,
+      );
+      stopwatch.stop();
+
+      return Ipv4ConnectivityResult(
+        success: true,
+        latency: stopwatch.elapsed,
+        resolvedAddress: address.address,
+      );
+    } on TimeoutException {
+      stopwatch.stop();
+      return Ipv4ConnectivityResult(
+        success: false,
+        latency: stopwatch.elapsed,
+        error: 'IPv4 connect timed out',
+        resolvedAddress: address.address,
+      );
+    } on SocketException catch (error) {
+      stopwatch.stop();
+      return Ipv4ConnectivityResult(
+        success: false,
+        latency: stopwatch.elapsed,
+        error: error.message.isEmpty ? 'IPv4 connect failed' : error.message,
+        resolvedAddress: address.address,
+      );
+    } catch (error) {
+      stopwatch.stop();
+      return Ipv4ConnectivityResult(
+        success: false,
+        latency: stopwatch.elapsed,
+        error: error.toString(),
+        resolvedAddress: address.address,
+      );
+    } finally {
+      await socket?.close();
+    }
+  }
+}
