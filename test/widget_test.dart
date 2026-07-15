@@ -100,16 +100,55 @@ void main() {
   });
 
   testWidgets('Results screen shows report sections', (WidgetTester tester) async {
+    final report = DiagnosticReport(
+      id: 'result-test',
+      createdAt: DateTime.utc(2026, 7, 15, 12, 30),
+      health: const NetworkHealth(
+        score: 74,
+        label: 'Fair',
+        summary: 'One elevated path detected.',
+        metrics: {'rules_evaluated': 5, 'rules_failed': 1},
+      ),
+      confidence: 0.86,
+      issues: const [
+        DiagnosticIssue(
+          id: 'github_connectivity',
+          title: 'GitHub is unreachable',
+          description: 'Probe returned HTTP 503.',
+          severity: DiagnosticSeverity.high,
+        ),
+      ],
+      recommendations: const [
+        Recommendation(
+          id: 'github-unreachable',
+          title: 'Check GitHub path',
+          detail: 'Retry when GitHub status recovers.',
+        ),
+      ],
+      metadata: const {
+        'ipv4_success': 'true',
+        'ipv4_latency_ms': '18',
+        'ipv4_address': '1.1.1.1',
+        'cloudflare_success': 'true',
+        'cloudflare_latency_ms': '22',
+        'cloudflare_http_status': '200',
+        'rules_evaluated': '5',
+        'rules_failed': '1',
+      },
+    );
+
     await tester.pumpWidget(
-      const MaterialApp(home: DiagnosticsResultPage()),
+      MaterialApp(home: DiagnosticsResultPage(report: report)),
     );
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 1100));
 
     expect(find.text('Scan results'), findsOneWidget);
     expect(find.text('Overall score'), findsOneWidget);
+    expect(find.text('Live'), findsOneWidget);
     expect(find.text('Latency by target'), findsOneWidget);
     expect(find.text('Health cards'), findsOneWidget);
+    expect(find.textContaining('Confidence'), findsWidgets);
 
     await tester.scrollUntilVisible(
       find.text('Recommendations'),
@@ -119,7 +158,64 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Detected issues'), findsOneWidget);
+    expect(find.text('GitHub is unreachable'), findsOneWidget);
     expect(find.text('Recommendations'), findsOneWidget);
+  });
+
+  testWidgets('Results screen handles empty report calmly', (WidgetTester tester) async {
+    final report = DiagnosticReport(
+      id: 'empty-test',
+      createdAt: DateTime.utc(2026, 7, 15, 9),
+      health: const NetworkHealth(
+        score: 96,
+        label: 'Excellent',
+        summary: 'All diagnosis rules passed.',
+      ),
+      confidence: 0.93,
+      metadata: const {
+        'ipv4_success': 'true',
+        'rules_evaluated': '5',
+        'rules_failed': '0',
+      },
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(home: DiagnosticsResultPage(report: report)),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.scrollUntilVisible(
+      find.text('Detected issues'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('No issues detected. This diagnostic run looks clear.'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Recommendations'),
+      120,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(
+      find.text(
+        'No recommendations right now. Keep an eye on confidence and latency.',
+      ),
+      findsOneWidget,
+    );
+  });
+
+  testWidgets('Results screen shows retry when load fails', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        home: DiagnosticsResultPage(coordinator: _FailingCoordinator()),
+      ),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 50));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unable to load results'), findsOneWidget);
+    expect(find.text('Retry'), findsOneWidget);
   });
 }
 

@@ -2,16 +2,25 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../application/diagnostics/diagnostics_coordinator.dart';
 import '../../design_system/design_system.dart';
-import 'diagnostics_result_mock.dart';
+import '../../di/app_services.dart';
+import '../../domain/models/diagnostics/diagnostic_report.dart';
+import 'diagnostics_result_view_data.dart';
 
-/// Diagnostics result report — mock data and presentation only.
+/// Diagnostics result report powered by a real [DiagnosticReport].
 class DiagnosticsResultPage extends StatefulWidget {
   const DiagnosticsResultPage({
     super.key,
+    this.report,
+    this.coordinator,
     this.onClose,
   });
 
+  /// When provided, skips loading and renders immediately.
+  final DiagnosticReport? report;
+
+  final DiagnosticsCoordinator? coordinator;
   final VoidCallback? onClose;
 
   @override
@@ -22,6 +31,14 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entrance;
 
+  DiagnosticsResultViewData? _data;
+  var _loading = true;
+  String? _error;
+  var _partial = false;
+
+  DiagnosticsCoordinator get _coordinator =>
+      widget.coordinator ?? AppServices.diagnostics;
+
   @override
   void initState() {
     super.initState();
@@ -29,12 +46,69 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
       vsync: this,
       duration: const Duration(milliseconds: 1000),
     )..forward();
+
+    final seeded = widget.report;
+    if (seeded != null) {
+      _applyReport(seeded);
+    } else {
+      _load();
+    }
   }
 
   @override
   void dispose() {
     _entrance.dispose();
     super.dispose();
+  }
+
+  void _applyReport(DiagnosticReport report) {
+    final data = DiagnosticsResultViewData.fromReport(report);
+    setState(() {
+      _data = data;
+      _loading = false;
+      _error = null;
+      _partial = report.metadata['ipv4_success'] == 'false' ||
+          report.metadata['cloudflare_success'] == 'false' ||
+          (report.issues.isNotEmpty && report.recommendations.isEmpty);
+    });
+    _entrance
+      ..reset()
+      ..forward();
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final report = await _coordinator.run();
+      if (!mounted) return;
+      _applyReport(report);
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _loading = false;
+        _error = _friendlyError(error);
+      });
+      _entrance
+        ..reset()
+        ..forward();
+    }
+  }
+
+  String _friendlyError(Object error) {
+    final message = error.toString();
+    if (message.contains('SocketException') ||
+        message.contains('Failed host lookup') ||
+        message.contains('Network is unreachable')) {
+      return 'Couldn’t reach the network to build results. Check connectivity and retry.';
+    }
+    if (message.contains('TimeoutException') || message.contains('timed out')) {
+      return 'The diagnostic run timed out before results were ready.';
+    }
+    return 'Unable to load diagnostic results. Please try again.';
   }
 
   void _handleClose() {
@@ -50,6 +124,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
+    final data = _data;
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -112,49 +187,84 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                                       style: text.headlineSmall,
                                     ),
                                     Text(
-                                      'Mock report · beautiful summary of this run',
+                                      _loading
+                                          ? 'Gathering diagnostic report…'
+                                          : _error != null
+                                              ? 'Results unavailable'
+                                              : '${data?.timestampLabel ?? ''} · live report',
                                       style: text.bodySmall,
                                     ),
                                   ],
                                 ),
                               ),
-                              const StatusBadge(
-                                label: 'Mock',
-                                tone: StatusBadgeTone.neutral,
+                              StatusBadge(
+                                label: _loading
+                                    ? 'Loading'
+                                    : _error != null
+                                        ? 'Error'
+                                        : _partial
+                                            ? 'Partial'
+                                            : 'Live',
+                                tone: _loading
+                                    ? StatusBadgeTone.info
+                                    : _error != null
+                                        ? StatusBadgeTone.error
+                                        : _partial
+                                            ? StatusBadgeTone.warning
+                                            : StatusBadgeTone.success,
                               ),
                             ],
                           ),
                         ),
                         const SizedBox(height: AppSpacing.xl),
-                        _FadeIn(
-                          animation: _entrance,
-                          interval: const Interval(0.05, 0.4),
-                          child: const _OverallScoreSection(),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _FadeIn(
-                          animation: _entrance,
-                          interval: const Interval(0.12, 0.5),
-                          child: const _ChartsSection(),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _FadeIn(
-                          animation: _entrance,
-                          interval: const Interval(0.2, 0.58),
-                          child: const _HealthCardsSection(),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _FadeIn(
-                          animation: _entrance,
-                          interval: const Interval(0.28, 0.66),
-                          child: const _IssuesSection(),
-                        ),
-                        const SizedBox(height: AppSpacing.lg),
-                        _FadeIn(
-                          animation: _entrance,
-                          interval: const Interval(0.36, 0.75),
-                          child: const _RecommendationsSection(),
-                        ),
+                        if (_loading) ...[
+                          const _LoadingCard(label: 'Building overall score…'),
+                          const SizedBox(height: AppSpacing.lg),
+                          const _LoadingCard(label: 'Preparing network metrics…'),
+                          const SizedBox(height: AppSpacing.lg),
+                          const _LoadingCard(label: 'Summarizing findings…'),
+                        ] else if (_error != null) ...[
+                          _FadeIn(
+                            animation: _entrance,
+                            interval: const Interval(0.08, 0.55),
+                            child: _ErrorCard(
+                              message: _error!,
+                              onRetry: _load,
+                            ),
+                          ),
+                        ] else if (data != null) ...[
+                          _FadeIn(
+                            animation: _entrance,
+                            interval: const Interval(0.05, 0.4),
+                            child: _OverallScoreSection(data: data),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _FadeIn(
+                            animation: _entrance,
+                            interval: const Interval(0.12, 0.5),
+                            child: _ChartsSection(data: data),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _FadeIn(
+                            animation: _entrance,
+                            interval: const Interval(0.2, 0.58),
+                            child: _HealthCardsSection(cards: data.metricCards),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _FadeIn(
+                            animation: _entrance,
+                            interval: const Interval(0.28, 0.66),
+                            child: _IssuesSection(issues: data.issues),
+                          ),
+                          const SizedBox(height: AppSpacing.lg),
+                          _FadeIn(
+                            animation: _entrance,
+                            interval: const Interval(0.36, 0.75),
+                            child: _RecommendationsSection(
+                              recommendations: data.recommendations,
+                            ),
+                          ),
+                        ],
                         const SizedBox(height: AppSpacing.xxl),
                         _FadeIn(
                           animation: _entrance,
@@ -165,7 +275,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                               label: 'Done',
                               icon: Icons.check_rounded,
                               expanded: true,
-                              onPressed: _handleClose,
+                              onPressed: _loading ? null : _handleClose,
                             ),
                           ),
                         ),
@@ -209,13 +319,87 @@ class _FadeIn extends StatelessWidget {
   }
 }
 
+class _LoadingCard extends StatelessWidget {
+  const _LoadingCard({required this.label});
+
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 22,
+            height: 22,
+            child: CircularProgressIndicator(strokeWidth: 2.2),
+          ),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              label,
+              style: AppTypography.textTheme.bodyMedium?.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorCard extends StatelessWidget {
+  const _ErrorCard({
+    required this.message,
+    required this.onRetry,
+  });
+
+  final String message;
+  final VoidCallback onRetry;
+
+  @override
+  Widget build(BuildContext context) {
+    return GlassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Unable to load results', style: AppTypography.textTheme.titleMedium),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            message,
+            style: AppTypography.textTheme.bodyMedium?.copyWith(
+              color: AppColors.onSurfaceVariant,
+              height: 1.5,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.lg),
+          SecondaryButton(
+            label: 'Retry',
+            icon: Icons.refresh_rounded,
+            onPressed: onRetry,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
 class _OverallScoreSection extends StatelessWidget {
-  const _OverallScoreSection();
+  const _OverallScoreSection({required this.data});
+
+  final DiagnosticsResultViewData data;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-    const score = DiagnosticsResultMock.overallScore;
+    final score = data.overallScore;
+    final barColor = switch (data.scoreTone) {
+      StatusBadgeTone.success => AppColors.success,
+      StatusBadgeTone.warning => AppColors.warning,
+      StatusBadgeTone.error => AppColors.error,
+      _ => AppColors.primary,
+    };
 
     return GlassCard(
       child: Row(
@@ -258,15 +442,15 @@ class _OverallScoreSection extends StatelessWidget {
                   children: [
                     Text('Overall score', style: text.titleMedium),
                     const Spacer(),
-                    const StatusBadge(
-                      label: DiagnosticsResultMock.scoreLabel,
-                      tone: StatusBadgeTone.warning,
+                    StatusBadge(
+                      label: data.scoreLabel,
+                      tone: data.scoreTone,
                     ),
                   ],
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  DiagnosticsResultMock.scoreSummary,
+                  data.scoreSummary,
                   style: text.bodyMedium?.copyWith(
                     color: AppColors.onSurfaceVariant,
                     height: 1.5,
@@ -279,8 +463,13 @@ class _OverallScoreSection extends StatelessWidget {
                     value: score / 100,
                     minHeight: 6,
                     backgroundColor: AppColors.surfaceHighest,
-                    color: AppColors.warning,
+                    color: barColor,
                   ),
+                ),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  'Confidence ${(data.confidence * 100).round()}% · ${data.timestampLabel}',
+                  style: text.labelSmall,
                 ),
               ],
             ),
@@ -292,7 +481,9 @@ class _OverallScoreSection extends StatelessWidget {
 }
 
 class _ChartsSection extends StatelessWidget {
-  const _ChartsSection();
+  const _ChartsSection({required this.data});
+
+  final DiagnosticsResultViewData data;
 
   @override
   Widget build(BuildContext context) {
@@ -309,26 +500,35 @@ class _ChartsSection extends StatelessWidget {
               Text('Latency by target', style: text.titleMedium),
               const SizedBox(height: AppSpacing.xxs),
               Text(
-                'Round-trip snapshot (mock ms)',
+                data.latencyBars.isEmpty
+                    ? 'No latency samples in this report'
+                    : 'Round-trip snapshot from this run',
                 style: text.labelSmall,
               ),
               const SizedBox(height: AppSpacing.lg),
               SizedBox(
                 height: 168,
                 width: double.infinity,
-                child: TweenAnimationBuilder<double>(
-                  tween: Tween(begin: 0, end: 1),
-                  duration: const Duration(milliseconds: 1100),
-                  curve: Curves.easeOutCubic,
-                  builder: (context, t, _) {
-                    return CustomPaint(
-                      painter: _LatencyBarsPainter(
-                        bars: DiagnosticsResultMock.latencyBars,
-                        progress: t,
+                child: data.latencyBars.isEmpty
+                    ? Center(
+                        child: Text(
+                          'Metrics unavailable',
+                          style: text.bodySmall,
+                        ),
+                      )
+                    : TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: 1),
+                        duration: const Duration(milliseconds: 1100),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, t, _) {
+                          return CustomPaint(
+                            painter: _LatencyBarsPainter(
+                              bars: data.latencyBars,
+                              progress: t,
+                            ),
+                          );
+                        },
                       ),
-                    );
-                  },
-                ),
               ),
             ],
           ),
@@ -341,7 +541,7 @@ class _ChartsSection extends StatelessWidget {
               Text('Stability trend', style: text.titleMedium),
               const SizedBox(height: AppSpacing.xxs),
               Text(
-                'Composite latency over this session',
+                'Composite signal from collected metrics',
                 style: text.labelSmall,
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -355,7 +555,7 @@ class _ChartsSection extends StatelessWidget {
                   builder: (context, t, _) {
                     return CustomPaint(
                       painter: _SparklinePainter(
-                        values: DiagnosticsResultMock.latencyTrend,
+                        values: data.stabilityTrend,
                         progress: t,
                         fill: true,
                         color: AppColors.primary,
@@ -392,11 +592,12 @@ class _ChartsSection extends StatelessWidget {
 }
 
 class _HealthCardsSection extends StatelessWidget {
-  const _HealthCardsSection();
+  const _HealthCardsSection({required this.cards});
+
+  final List<MetricCardView> cards;
 
   @override
   Widget build(BuildContext context) {
-    final cards = DiagnosticsResultMock.healthCards;
     final text = AppTypography.textTheme;
 
     return Column(
@@ -404,31 +605,41 @@ class _HealthCardsSection extends StatelessWidget {
       children: [
         Text('Health cards', style: text.titleMedium),
         const SizedBox(height: AppSpacing.sm),
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final width = constraints.maxWidth;
-            final crossAxisCount = width >= 820
-                ? 3
-                : width >= 540
-                    ? 2
-                    : 1;
-            final itemWidth =
-                (width - (AppSpacing.sm * (crossAxisCount - 1))) /
-                    crossAxisCount;
+        if (cards.isEmpty)
+          GlassCard(
+            child: Text(
+              'No network metrics were captured for this run.',
+              style: text.bodyMedium?.copyWith(
+                color: AppColors.onSurfaceVariant,
+              ),
+            ),
+          )
+        else
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final width = constraints.maxWidth;
+              final crossAxisCount = width >= 820
+                  ? 3
+                  : width >= 540
+                      ? 2
+                      : 1;
+              final itemWidth =
+                  (width - (AppSpacing.sm * (crossAxisCount - 1))) /
+                      crossAxisCount;
 
-            return Wrap(
-              spacing: AppSpacing.sm,
-              runSpacing: AppSpacing.sm,
-              children: [
-                for (final card in cards)
-                  SizedBox(
-                    width: itemWidth,
-                    child: _HealthCard(card: card),
-                  ),
-              ],
-            );
-          },
-        ),
+              return Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  for (final card in cards)
+                    SizedBox(
+                      width: itemWidth,
+                      child: _HealthCard(card: card),
+                    ),
+                ],
+              );
+            },
+          ),
       ],
     );
   }
@@ -437,7 +648,7 @@ class _HealthCardsSection extends StatelessWidget {
 class _HealthCard extends StatelessWidget {
   const _HealthCard({required this.card});
 
-  final HealthCardMock card;
+  final MetricCardView card;
 
   @override
   Widget build(BuildContext context) {
@@ -497,7 +708,9 @@ class _HealthCard extends StatelessWidget {
 }
 
 class _IssuesSection extends StatelessWidget {
-  const _IssuesSection();
+  const _IssuesSection({required this.issues});
+
+  final List<IssueView> issues;
 
   @override
   Widget build(BuildContext context) {
@@ -512,20 +725,31 @@ class _IssuesSection extends StatelessWidget {
               Text('Detected issues', style: text.titleMedium),
               const Spacer(),
               StatusBadge(
-                label: '${DiagnosticsResultMock.issues.length} found',
-                tone: StatusBadgeTone.warning,
+                label: issues.isEmpty ? 'None' : '${issues.length} found',
+                tone: issues.isEmpty
+                    ? StatusBadgeTone.success
+                    : StatusBadgeTone.warning,
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
-          for (var i = 0; i < DiagnosticsResultMock.issues.length; i++) ...[
-            if (i > 0) ...[
-              const SizedBox(height: AppSpacing.sm),
-              const Divider(height: 1),
-              const SizedBox(height: AppSpacing.sm),
+          if (issues.isEmpty)
+            Text(
+              'No issues detected. This diagnostic run looks clear.',
+              style: text.bodyMedium?.copyWith(
+                color: AppColors.onSurfaceVariant,
+                height: 1.45,
+              ),
+            )
+          else
+            for (var i = 0; i < issues.length; i++) ...[
+              if (i > 0) ...[
+                const SizedBox(height: AppSpacing.sm),
+                const Divider(height: 1),
+                const SizedBox(height: AppSpacing.sm),
+              ],
+              _IssueRow(issue: issues[i]),
             ],
-            _IssueRow(issue: DiagnosticsResultMock.issues[i]),
-          ],
         ],
       ),
     );
@@ -535,14 +759,16 @@ class _IssuesSection extends StatelessWidget {
 class _IssueRow extends StatelessWidget {
   const _IssueRow({required this.issue});
 
-  final IssueMock issue;
+  final IssueView issue;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-    final accent = issue.tone == StatusBadgeTone.warning
-        ? AppColors.warning
-        : AppColors.primary;
+    final accent = switch (issue.tone) {
+      StatusBadgeTone.warning => AppColors.warning,
+      StatusBadgeTone.error => AppColors.error,
+      _ => AppColors.primary,
+    };
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -587,7 +813,9 @@ class _IssueRow extends StatelessWidget {
 }
 
 class _RecommendationsSection extends StatelessWidget {
-  const _RecommendationsSection();
+  const _RecommendationsSection({required this.recommendations});
+
+  final List<RecommendationView> recommendations;
 
   @override
   Widget build(BuildContext context) {
@@ -599,15 +827,22 @@ class _RecommendationsSection extends StatelessWidget {
         children: [
           Text('Recommendations', style: text.titleMedium),
           const SizedBox(height: AppSpacing.md),
-          for (var i = 0;
-              i < DiagnosticsResultMock.recommendations.length;
-              i++) ...[
-            if (i > 0) const SizedBox(height: AppSpacing.sm),
-            _RecommendationTile(
-              item: DiagnosticsResultMock.recommendations[i],
-              index: i + 1,
-            ),
-          ],
+          if (recommendations.isEmpty)
+            Text(
+              'No recommendations right now. Keep an eye on confidence and latency.',
+              style: text.bodyMedium?.copyWith(
+                color: AppColors.onSurfaceVariant,
+                height: 1.45,
+              ),
+            )
+          else
+            for (var i = 0; i < recommendations.length; i++) ...[
+              if (i > 0) const SizedBox(height: AppSpacing.sm),
+              _RecommendationTile(
+                item: recommendations[i],
+                index: i + 1,
+              ),
+            ],
         ],
       ),
     );
@@ -620,7 +855,7 @@ class _RecommendationTile extends StatelessWidget {
     required this.index,
   });
 
-  final RecommendationMock item;
+  final RecommendationView item;
   final int index;
 
   @override
@@ -729,7 +964,7 @@ class _LatencyBarsPainter extends CustomPainter {
     required this.progress,
   });
 
-  final List<LatencyBarMock> bars;
+  final List<LatencyBarView> bars;
   final double progress;
 
   @override

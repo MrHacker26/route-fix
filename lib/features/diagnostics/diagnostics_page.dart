@@ -228,7 +228,7 @@ class _DiagnosticsPageState extends State<DiagnosticsPage>
                         children: [
                           Text(
                             _finished
-                                ? 'Scan complete · presentation only'
+                                ? 'Scan complete · open full results'
                                 : 'Watching each path come alive…',
                             style: text.bodySmall,
                             textAlign: TextAlign.center,
