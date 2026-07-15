@@ -128,6 +128,20 @@ final class DiagnosticsResultViewData {
       return (primary: null, secondary: const []);
     }
 
+    // Never recommend Auto Fix without strong evidence.
+    final hasStrongEvidence = report.confidence >= 0.85 ||
+        report.issues.any((issue) {
+          final parsed = double.tryParse(
+            issue.metadata['rule_confidence'] ??
+                issue.metadata['confidence'] ??
+                '',
+          );
+          return parsed != null && parsed >= 0.85;
+        });
+    if (!hasStrongEvidence) {
+      return (primary: null, secondary: const []);
+    }
+
     final hasLatency = issueCodes.contains('ipv6_latency');
     final hasUnavailable = issueCodes.contains('ipv6_unavailable');
 
@@ -418,21 +432,30 @@ final class DiagnosticsResultViewData {
     final metrics = <NetworkMetricView>[];
 
     // DNS
-    final dnsOk = meta['dns_success'] != 'false';
+    final dnsOk = meta['dns_success'] == 'true';
     final dnsMs = meta['dns_lookup_ms'];
+    final dnsKnown = meta.containsKey('dns_success') || dnsMs != null;
     metrics.add(
       NetworkMetricView(
         title: 'DNS',
-        value: dnsOk
-            ? (dnsMs != null ? '$dnsMs ms' : 'Resolved')
-            : 'Unavailable',
-        detail: dnsOk
-            ? 'Resolved'
-            : HumanMessage.fromProbeError(
-                meta['dns_error'],
-                fallback: 'We couldn’t verify DNS.',
-              ),
-        tone: dnsOk ? StatusBadgeTone.success : StatusBadgeTone.error,
+        value: !dnsKnown
+            ? '— Not Checked'
+            : dnsOk
+                ? (dnsMs != null ? '✓ $dnsMs ms' : '✓ Resolved')
+                : '✕ Unavailable',
+        detail: !dnsKnown
+            ? 'No DNS evidence in this scan.'
+            : dnsOk
+                ? 'Name lookup completed.'
+                : HumanMessage.fromProbeError(
+                    meta['dns_error'],
+                    fallback: 'We couldn’t verify DNS.',
+                  ),
+        tone: !dnsKnown
+            ? StatusBadgeTone.neutral
+            : dnsOk
+                ? StatusBadgeTone.success
+                : StatusBadgeTone.error,
         icon: Icons.dns_outlined,
         technicalDetail: [
           if (dnsMs != null) 'DNS lookup: $dnsMs ms',
@@ -445,19 +468,30 @@ final class DiagnosticsResultViewData {
     final ipv4Ok = meta['ipv4_success'] == 'true';
     final ipv4TcpMs = meta['ipv4_tcp_ms'] ?? meta['ipv4_latency_ms'];
     final ipv4DnsMs = meta['ipv4_dns_ms'];
+    final ipv4Known = meta.containsKey('ipv4_success') || ipv4TcpMs != null;
     metrics.add(
       NetworkMetricView(
         title: 'IPv4',
-        value: ipv4Ok
-            ? (ipv4TcpMs != null ? '$ipv4TcpMs ms' : 'Connected')
-            : 'Unavailable',
-        detail: ipv4Ok
-            ? 'Connected'
-            : HumanMessage.fromProbeError(
-                meta['ipv4_error'],
-                fallback: 'We couldn’t verify IPv4.',
-              ),
-        tone: ipv4Ok ? StatusBadgeTone.success : StatusBadgeTone.error,
+        value: !ipv4Known
+            ? '— Not Checked'
+            : ipv4Ok
+                ? (ipv4TcpMs != null
+                    ? '✓ Connected · $ipv4TcpMs ms'
+                    : '✓ Connected')
+                : '✕ Unavailable',
+        detail: !ipv4Known
+            ? 'No IPv4 evidence in this scan.'
+            : ipv4Ok
+                ? 'TCP path connected.'
+                : HumanMessage.fromProbeError(
+                    meta['ipv4_error'],
+                    fallback: 'We couldn’t verify IPv4.',
+                  ),
+        tone: !ipv4Known
+            ? StatusBadgeTone.neutral
+            : ipv4Ok
+                ? StatusBadgeTone.success
+                : StatusBadgeTone.error,
         icon: Icons.filter_1_rounded,
         technicalDetail: [
           if (ipv4DnsMs != null) 'DNS: $ipv4DnsMs ms',
@@ -468,37 +502,46 @@ final class DiagnosticsResultViewData {
       ),
     );
 
-    // IPv6 — never invent success; no native AAAA → explicit unavailable.
+    // IPv6 — never invent success
     final ipv6Ok = meta['ipv6_success'] == 'true';
     final ipv6TcpMs = meta['ipv6_tcp_ms'] ?? meta['ipv6_latency_ms'];
     final ipv6DnsMs = meta['ipv6_dns_ms'];
     final ipv6Error = meta['ipv6_error'] ?? '';
-    final noNativeIpv6 = !ipv6Ok &&
-        (ipv6Error.toLowerCase().contains('no ipv6 address advertised') ||
-            ipv6Error.toLowerCase().contains('no ipv6 route advertised') ||
-            ipv6TcpMs == null);
+    final ipv6Known = meta.containsKey('ipv6_success') ||
+        ipv6TcpMs != null ||
+        ipv6Error.isNotEmpty;
+    final noNativeIpv6 = ipv6Known &&
+        !ipv6Ok &&
+        (ipv6Error.toLowerCase().contains('no ipv6 address') ||
+            ipv6Error.toLowerCase().contains('no ipv6 route') ||
+            ipv6Error.toLowerCase().contains('no native'));
     metrics.add(
       NetworkMetricView(
         title: 'IPv6',
-        value: ipv6Ok
-            ? (ipv6TcpMs != null ? '$ipv6TcpMs ms' : 'Connected')
-            : 'Unavailable',
-        detail: ipv6Ok
-            ? 'Connected'
-            : (noNativeIpv6
-                ? 'No IPv6 route advertised.'
-                : HumanMessage.fromProbeError(
-                    meta['ipv6_error'],
-                    fallback: 'We couldn’t verify IPv6.',
-                  )),
-        tone: ipv6Ok
-            ? (ipv6TcpMs != null &&
-                    ipv4TcpMs != null &&
-                    (double.tryParse(ipv6TcpMs) ?? 0) >
-                        (double.tryParse(ipv4TcpMs) ?? 0) * 2
-                ? StatusBadgeTone.warning
-                : StatusBadgeTone.success)
-            : StatusBadgeTone.neutral,
+        value: !ipv6Known
+            ? '— Not Checked'
+            : ipv6Ok
+                ? (ipv6TcpMs != null
+                    ? '✓ Native · $ipv6TcpMs ms'
+                    : '✓ Native')
+                : (noNativeIpv6 ? '— Ready' : '✕ Unavailable'),
+        detail: !ipv6Known
+            ? 'No IPv6 evidence in this scan.'
+            : ipv6Ok
+                ? 'Native IPv6 path available.'
+                : (noNativeIpv6
+                    ? 'No native IPv6 advertised.'
+                    : HumanMessage.fromProbeError(
+                        meta['ipv6_error'],
+                        fallback: 'We couldn’t verify IPv6.',
+                      )),
+        tone: !ipv6Known
+            ? StatusBadgeTone.neutral
+            : ipv6Ok
+                ? StatusBadgeTone.success
+                : (noNativeIpv6
+                    ? StatusBadgeTone.neutral
+                    : StatusBadgeTone.warning),
         icon: Icons.filter_6_rounded,
         technicalDetail: [
           if (ipv6DnsMs != null) 'DNS: $ipv6DnsMs ms',
@@ -509,30 +552,75 @@ final class DiagnosticsResultViewData {
       ),
     );
 
+    // TLS
+    final cfOk = meta['cloudflare_success'] == 'true';
+    final tlsMs = meta['cloudflare_tls_ms'];
+    final tlsKnown = cfOk || tlsMs != null || meta['cloudflare_error'] != null;
+    metrics.add(
+      NetworkMetricView(
+        title: 'TLS',
+        value: !tlsKnown
+            ? '— Not Checked'
+            : cfOk
+                ? (tlsMs != null ? '✓ $tlsMs ms' : '✓ Successful')
+                : '✕ Unavailable',
+        detail: !tlsKnown
+            ? 'No TLS evidence in this scan.'
+            : cfOk
+                ? 'Secure handshake completed.'
+                : HumanMessage.fromProbeError(
+                    meta['cloudflare_error'],
+                    fallback: 'TLS could not be verified.',
+                  ),
+        tone: !tlsKnown
+            ? StatusBadgeTone.neutral
+            : cfOk
+                ? StatusBadgeTone.success
+                : StatusBadgeTone.error,
+        icon: Icons.lock_outline_rounded,
+        technicalDetail: [
+          if (tlsMs != null) 'TLS: $tlsMs ms',
+          if (meta['cloudflare_error'] != null) meta['cloudflare_error']!,
+        ].join('\n'),
+      ),
+    );
+
     // HTTPS
-    final cfOk = meta['cloudflare_success'] != 'false';
     final cfHttpMs = meta['cloudflare_http_ms'] ?? meta['cloudflare_latency_ms'];
     final cfStatus = meta['cloudflare_http_status'];
     final cfStatusCode = int.tryParse(cfStatus ?? '');
-    final httpsValue = !cfOk
-        ? 'Unavailable'
-        : (cfStatusCode != null
-            ? (cfStatusCode >= 200 && cfStatusCode < 400
-                ? '$cfStatusCode OK'
-                : '$cfStatusCode')
-            : (cfHttpMs != null ? '$cfHttpMs ms' : 'Verified'));
+    final httpsKnown = meta.containsKey('cloudflare_success') ||
+        cfStatus != null ||
+        cfHttpMs != null;
+    final httpsValue = !httpsKnown
+        ? '— Not Checked'
+        : !cfOk
+            ? '✕ Unavailable'
+            : (cfStatusCode != null &&
+                    cfStatusCode >= 200 &&
+                    cfStatusCode < 400
+                ? '✓ $cfStatusCode OK'
+                : cfStatusCode != null
+                    ? '✓ $cfStatusCode'
+                    : (cfHttpMs != null ? '✓ $cfHttpMs ms' : '✓ Verified'));
     metrics.add(
       NetworkMetricView(
         title: 'HTTPS',
         value: httpsValue,
-        detail: cfOk
-            ? 'Verified'
-            : HumanMessage.fromProbeError(
-                meta['cloudflare_error'],
-                fallback: 'We couldn’t verify HTTPS.',
-              ),
-        tone: cfOk ? StatusBadgeTone.success : StatusBadgeTone.warning,
-        icon: Icons.lock_outline_rounded,
+        detail: !httpsKnown
+            ? 'No HTTPS evidence in this scan.'
+            : cfOk
+                ? 'HTTPS verified successfully.'
+                : HumanMessage.fromProbeError(
+                    meta['cloudflare_error'],
+                    fallback: 'We couldn’t verify HTTPS.',
+                  ),
+        tone: !httpsKnown
+            ? StatusBadgeTone.neutral
+            : cfOk
+                ? StatusBadgeTone.success
+                : StatusBadgeTone.error,
+        icon: Icons.https_outlined,
         technicalDetail: [
           if (meta['cloudflare_dns_ms'] != null)
             'DNS: ${meta['cloudflare_dns_ms']} ms',

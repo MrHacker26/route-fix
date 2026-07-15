@@ -1,5 +1,6 @@
+import 'dart:io';
+
 import 'package:flutter_test/flutter_test.dart';
-import 'package:route_fix/data/autofix/windows/windows_admin_requirement.dart';
 import 'package:route_fix/data/autofix/windows/windows_ipv6_fix_commands.dart';
 import 'package:route_fix/data/autofix/windows_fix_provider.dart';
 import 'package:route_fix/domain/autofix/autofix.dart';
@@ -7,7 +8,11 @@ import 'package:route_fix/domain/autofix/autofix.dart';
 void main() {
   group('WindowsFixProvider', () {
     test('marks IPv6 actions as requiring elevation', () {
-      const provider = WindowsFixProvider();
+      final provider = WindowsFixProvider(
+        runProcess: (executable, arguments) async {
+          fail('should not run while listing actions');
+        },
+      );
       final actions = provider.availableActions();
 
       final disable =
@@ -15,73 +20,65 @@ void main() {
       final enable =
           actions.firstWhere((a) => a.kind == FixActionKind.enableIpv6);
 
+      expect(disable.title, 'Prefer IPv4');
+      expect(enable.title, 'Restore Default Network Configuration');
       expect(disable.availability, FixAvailability.requiresElevation);
       expect(enable.availability, FixAvailability.requiresElevation);
     });
 
-    test('prepare disable IPv6 without executing', () async {
-      const provider = WindowsFixProvider();
-
-      final result = await provider.apply(FixActionKind.disableIpv6);
-
-      expect(result.success, isTrue);
-      expect(result.executed, isFalse);
-      expect(result.platform, FixPlatform.windows);
-      expect(result.requiresElevation, isTrue);
-      expect(result.message, contains('not executed'));
-      expect(result.executedCommand, contains('powershell.exe'));
-      expect(result.executedCommand, contains('Disable-NetAdapterBinding'));
-      expect(result.executedCommand, contains('ms_tcpip6'));
-      expect(result.metadata['execution'], 'deferred');
-      expect(result.metadata['netsh'], contains('netsh interface ipv6'));
-    });
-
-    test('prepare enable IPv6 without executing', () async {
-      const provider = WindowsFixProvider();
-
-      final result = await provider.apply(FixActionKind.enableIpv6);
-
-      expect(result.success, isTrue);
-      expect(result.executed, isFalse);
-      expect(result.platform, FixPlatform.windows);
-      expect(result.requiresElevation, isTrue);
-      expect(result.executedCommand, contains('Enable-NetAdapterBinding'));
-      expect(result.message, contains('enable IPv6'));
-    });
-
-    test('reports elevation status when a probe is supplied', () async {
+    test('executes Prefer IPv4 via PowerShell argv', () async {
+      final commands = <List<String>>[];
       final provider = WindowsFixProvider(
-        adminResolver: WindowsAdminRequirementResolver(
-          elevationProbe: () async => true,
-        ),
+        runProcess: (executable, arguments) async {
+          commands.add([executable, ...arguments]);
+          return ProcessResult(1, 0, '', '');
+        },
       );
 
       final result = await provider.apply(FixActionKind.disableIpv6);
 
       expect(result.success, isTrue);
-      expect(result.executed, isFalse);
-      expect(result.requiresElevation, isFalse);
-      expect(result.metadata['isElevated'], 'true');
-      expect(result.message, contains('elevated'));
+      expect(result.executed, isTrue);
+      expect(result.platform, FixPlatform.windows);
+      expect(result.requiresElevation, isTrue);
+      expect(result.message, contains('Prefer IPv4'));
+      expect(commands.single.first, 'powershell.exe');
+      expect(commands.single.join(' '), contains('Disable-NetAdapterBinding'));
+      expect(commands.single.join(' '), contains('ms_tcpip6'));
     });
 
-    test('requiresElevation stays true when probe reports not elevated',
-        () async {
+    test('executes restore via PowerShell', () async {
       final provider = WindowsFixProvider(
-        adminResolver: WindowsAdminRequirementResolver(
-          elevationProbe: () async => false,
-        ),
+        runProcess: (executable, arguments) async {
+          expect(arguments.join(' '), contains('Enable-NetAdapterBinding'));
+          return ProcessResult(1, 0, '', '');
+        },
       );
 
       final result = await provider.apply(FixActionKind.enableIpv6);
-
-      expect(result.requiresElevation, isTrue);
-      expect(result.metadata['isElevated'], 'false');
-      expect(result.message, contains('not elevated'));
+      expect(result.success, isTrue);
+      expect(result.message, contains('restored'));
     });
 
-    test('exposes only FixProvider surface for future actions', () async {
-      const provider = WindowsFixProvider();
+    test('maps permission failures to a calm message', () async {
+      final provider = WindowsFixProvider(
+        runProcess: (executable, arguments) async {
+          return ProcessResult(1, 1, '', 'Access is denied.');
+        },
+      );
+
+      final result = await provider.apply(FixActionKind.disableIpv6);
+      expect(result.success, isFalse);
+      expect(result.message, contains('administrator permission'));
+      expect(result.error, contains('Access is denied'));
+    });
+
+    test('exposes comingSoon for future actions', () async {
+      final provider = WindowsFixProvider(
+        runProcess: (executable, arguments) async {
+          fail('should not run for unimplemented fixes');
+        },
+      );
       final result = await provider.apply(FixActionKind.openWarp);
 
       expect(result.executed, isFalse);

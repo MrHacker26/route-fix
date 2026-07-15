@@ -6,8 +6,9 @@ abstract final class HumanMessage {
     final lower = message.toLowerCase();
 
     if (lower.contains('no ipv6 address advertised') ||
-        lower.contains('no ipv6 route advertised')) {
-      return 'No IPv6 route advertised.';
+        lower.contains('no ipv6 route advertised') ||
+        lower.contains('no native ipv6')) {
+      return 'No native IPv6 advertised.';
     }
     if (lower.contains('permission denied') || lower.contains('not permitted')) {
       return 'RouteFix needs administrator permission to continue.';
@@ -44,11 +45,11 @@ abstract final class HumanMessage {
 
   static String severityLabel(String raw) {
     return switch (raw.toLowerCase()) {
-      'critical' => 'Needs attention',
-      'high' => 'Needs attention',
-      'medium' => 'Noticeable',
-      'low' => 'Minor',
-      'info' => 'Info',
+      'critical' => 'Needs Attention',
+      'high' => 'Needs Attention',
+      'medium' => 'Needs Attention',
+      'low' => 'Ready',
+      'info' => 'Ready',
       _ => raw,
     };
   }
@@ -89,14 +90,13 @@ abstract final class HumanMessage {
     return switch (confidenceStrength(confidence)) {
       'Strong' => 'Strong evidence',
       'Medium' => 'Medium evidence',
-      _ => 'Low evidence',
+      _ => 'Limited evidence',
     };
   }
 
   static String scoreBadge(int score) {
-    if (score >= 90) return 'Healthy';
-    if (score >= 75) return 'Looking good';
-    if (score >= 55) return 'Needs attention';
-    return 'Unhealthy';
+    if (score >= 75) return 'Healthy';
+    if (score >= 55) return 'Needs Attention';
+    return 'Needs Attention';
   }
 }

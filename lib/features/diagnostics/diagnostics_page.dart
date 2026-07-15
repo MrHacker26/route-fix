@@ -482,7 +482,7 @@ class _DiagnosticTile extends StatelessWidget {
                       child: StatusBadge(
                         label: switch (data.outcome) {
                           DiagnosticOutcome.success => 'Healthy',
-                          DiagnosticOutcome.warning => 'Needs attention',
+                          DiagnosticOutcome.warning => 'Needs Attention',
                           DiagnosticOutcome.info => 'Checked',
                         },
                         tone: switch (data.outcome) {

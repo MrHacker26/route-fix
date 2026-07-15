@@ -155,18 +155,28 @@ class _OnboardingStepView extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer,
-                      borderRadius: AppRadius.mdAll,
-                    ),
-                    child: Icon(
-                      step.icon,
-                      color: AppColors.primary,
-                      size: AppSpacing.iconLead,
-                    ),
+                  ClipRRect(
+                    borderRadius: AppRadius.mdAll,
+                    child: step.title == 'RouteFix'
+                        ? Image.asset(
+                            AppAssets.appIcon,
+                            width: 48,
+                            height: 48,
+                            filterQuality: FilterQuality.medium,
+                          )
+                        : Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: AppColors.primaryContainer,
+                              borderRadius: AppRadius.mdAll,
+                            ),
+                            child: Icon(
+                              step.icon,
+                              color: AppColors.primary,
+                              size: AppSpacing.iconLead,
+                            ),
+                          ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   StatusBadge(

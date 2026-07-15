@@ -40,7 +40,7 @@ abstract final class AppTheme {
         color: AppColors.surfaceContainer,
         surfaceTintColor: Colors.transparent,
         shape: RoundedRectangleBorder(
-          borderRadius: AppRadius.lgAll,
+          borderRadius: AppRadius.mdAll,
           side: const BorderSide(color: AppColors.outlineSubtle),
         ),
       ),

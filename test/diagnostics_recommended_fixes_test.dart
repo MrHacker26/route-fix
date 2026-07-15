@@ -40,7 +40,7 @@ void main() {
 
     final selected = DiagnosticsResultViewData.selectRecommendedFixes(
       report: report,
-      fixProvider: const MacOsFixProvider(),
+      fixProvider: MacOsFixProvider(),
     );
 
     expect(selected.primary?.kind, FixActionKind.disableIpv6);
@@ -48,7 +48,6 @@ void main() {
       selected.secondary.map((f) => f.kind),
       isNot(contains(FixActionKind.enableIpv6)),
     );
-    expect(selected.primary?.why, contains('TCP connect'));
     expect(selected.primary?.why, contains('slower than IPv4'));
     expect(selected.primary?.confidenceLabel, 'Strong');
     expect(selected.primary?.backedByRuleIds, contains('ipv6_latency'));
@@ -66,7 +65,7 @@ void main() {
 
     final data = DiagnosticsResultViewData.fromReport(
       report,
-      fixProvider: const MacOsFixProvider(),
+      fixProvider: MacOsFixProvider(),
     );
 
     expect(data.primaryFix, isNull);

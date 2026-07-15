@@ -48,7 +48,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
       onExit: enabled ? (_) => setState(() => _hovered = false) : null,
       child: AnimatedScale(
         scale: enabled && _hovered ? 1.015 : 1,
-        duration: const Duration(milliseconds: 140),
+        duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
         child: DecoratedBox(
           decoration: BoxDecoration(
@@ -69,7 +69,7 @@ class _PrimaryButtonState extends State<PrimaryButton> {
                 horizontal: AppSpacing.buttonPaddingH,
                 vertical: AppSpacing.buttonPaddingV,
               ),
-              minimumSize: const Size(64, 44),
+              minimumSize: const Size(64, 36),
               shape: RoundedRectangleBorder(borderRadius: AppRadius.mdAll),
               textStyle: AppTypography.textTheme.labelLarge,
             ),

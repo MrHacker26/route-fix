@@ -17,10 +17,15 @@ void main() {
     expect(find.text('Continue'), findsOneWidget);
   });
 
-  testWidgets('Dashboard loads coordinator data into health report', (
+  testWidgets('Dashboard loads as desktop command center', (
     WidgetTester tester,
   ) async {
     final coordinator = _FakeCoordinator();
+
+    await tester.binding.setSurfaceSize(const Size(1280, 900));
+    addTearDown(() async {
+      await tester.binding.setSurfaceSize(null);
+    });
 
     await tester.pumpWidget(
       MaterialApp(
@@ -28,34 +33,40 @@ void main() {
       ),
     );
 
-    expect(find.text('Scanning'), findsOneWidget);
-    expect(find.text('Running diagnostic checks…'), findsOneWidget);
+    expect(find.text('Investigating'), findsOneWidget);
+    expect(find.text('Checking network health…'), findsOneWidget);
 
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 100));
     await tester.pumpAndSettle();
 
-    expect(find.text('Health report'), findsOneWidget);
-    expect(find.text('Live'), findsOneWidget);
-    expect(find.text('Overall health'), findsOneWidget);
-    expect(find.text('Connection status'), findsOneWidget);
+    expect(find.text('RouteFix'), findsWidgets);
+    expect(find.text('Run Scan'), findsOneWidget);
+    expect(find.text('Health Summary'), findsOneWidget);
+    expect(find.text('Network Snapshot'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Quick summary'),
-      120,
+      find.text('Recommendation'),
+      80,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Quick summary'), findsOneWidget);
+    expect(find.text('Recommendation'), findsOneWidget);
+    expect(find.text('Recent Scan'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Start diagnostics'),
-      200,
+      find.textContaining('Developer'),
+      80,
       scrollable: find.byType(Scrollable).first,
     );
-    await tester.pumpAndSettle();
+    expect(find.text('Developer Services'), findsOneWidget);
 
-    expect(find.text('Recent scan'), findsOneWidget);
-    expect(find.text('Start diagnostics'), findsOneWidget);
+    await tester.scrollUntilVisible(
+      find.text('Technical Details'),
+      80,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(find.text('Technical Details'), findsOneWidget);
+    expect(find.text('Everything looks healthy.'), findsOneWidget);
   });
 
   testWidgets('Dashboard shows retry when coordinator fails', (
@@ -145,9 +156,8 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1100));
 
     expect(find.text('Results'), findsOneWidget);
-    expect(find.text('Health'), findsWidgets);
-    expect(find.text('Healthy'), findsOneWidget);
-    expect(find.text('Network path'), findsOneWidget);
+    expect(find.text('Health Summary'), findsWidgets);
+    expect(find.text('Network Snapshot'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Problem'),
@@ -234,10 +244,23 @@ class _FakeCoordinator implements DiagnosticsCoordinator {
       confidence: 0.9,
       metadata: const {
         'target_hostname': 'www.cloudflare.com',
+        'dns_success': 'true',
+        'dns_lookup_ms': '12',
         'ipv4_success': 'true',
         'ipv4_address': '1.1.1.1',
+        'ipv4_tcp_ms': '18',
+        'ipv6_success': 'false',
+        'ipv6_error': 'No IPv6 address advertised by target.',
+        'github_success': 'true',
+        'github_http_status': '200',
+        'github_http_ms': '40',
+        'cloudflare_success': 'true',
         'cloudflare_http_status': '200',
+        'cloudflare_http_ms': '22',
+        'cloudflare_tls_ms': '15',
+        'pypi_index_http_ms': '55',
         'rules_evaluated': '5',
+        'rules_failed': '0',
       },
     );
   }

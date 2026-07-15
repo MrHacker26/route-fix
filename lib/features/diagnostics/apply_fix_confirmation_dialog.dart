@@ -10,9 +10,6 @@ enum ApplyFixConfirmationResult {
 }
 
 /// Shows the Apply Fix confirmation dialog.
-///
-/// Returns [ApplyFixConfirmationResult.confirmed] when the user confirms.
-/// The caller is responsible for applying the fix via the platform provider.
 Future<ApplyFixConfirmationResult> showApplyFixConfirmation(
   BuildContext context, {
   required RecommendedFixView fix,
@@ -37,7 +34,10 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-    final needsAdmin = fix.requiresElevation;
+    final isPreferIpv4 = fix.title == 'Prefer IPv4' ||
+        fix.id == 'disableIpv6' ||
+        fix.kind.name == 'disableIpv6';
+    final title = isPreferIpv4 ? 'Prefer IPv4?' : '${fix.title}?';
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -53,117 +53,29 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    width: 44,
-                    height: 44,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryContainer,
-                      borderRadius: AppRadius.mdAll,
-                      border: Border.all(color: AppColors.outlineSubtle),
-                    ),
-                    child: Icon(
-                      fix.icon,
-                      size: AppSpacing.iconLead,
-                      color: AppColors.primary,
-                    ),
-                  ),
-                  const SizedBox(width: AppSpacing.sm),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('Apply fix?', style: text.titleLarge),
-                        const SizedBox(height: AppSpacing.xxs),
-                        Text(
-                          'Confirm before changing network settings.',
-                          style: text.bodySmall?.copyWith(
-                            color: AppColors.onSurfaceVariant,
-                            height: 1.4,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppSpacing.lg),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(AppSpacing.md),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceLow.withValues(alpha: 0.7),
-                  borderRadius: AppRadius.mdAll,
-                  border: Border.all(color: AppColors.outlineSubtle),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(fix.title, style: text.titleSmall),
-                        ),
-                        StatusBadge(
-                          label: fix.availabilityLabel,
-                          tone: fix.availabilityTone,
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Text(
-                      fix.description,
-                      style: text.bodySmall?.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                        height: 1.45,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              if (needsAdmin) ...[
-                const SizedBox(height: AppSpacing.md),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(AppSpacing.sm),
-                  decoration: BoxDecoration(
-                    color: AppColors.warningContainer.withValues(alpha: 0.55),
-                    borderRadius: AppRadius.smAll,
-                    border: Border.all(
-                      color: AppColors.warning.withValues(alpha: 0.35),
-                    ),
-                  ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(
-                        Icons.admin_panel_settings_outlined,
-                        size: AppSpacing.iconInline,
-                        color: AppColors.warning,
-                      ),
-                      const SizedBox(width: AppSpacing.xs),
-                      Expanded(
-                        child: Text(
-                          'This change typically requires administrator privileges on your device.',
-                          style: text.bodySmall?.copyWith(
-                            color: AppColors.onSurface,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+              Text(title, style: text.titleLarge),
               const SizedBox(height: AppSpacing.md),
               Text(
-                'Confirming will ask RouteFix to apply this change on your device.',
-                style: text.bodySmall?.copyWith(
-                  color: AppColors.onSurfaceMuted,
-                  height: 1.4,
+                'RouteFix will temporarily modify your network configuration.',
+                style: text.bodyMedium?.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'Administrator permission may be required.',
+                style: text.bodyMedium?.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  height: 1.45,
+                ),
+              ),
+              const SizedBox(height: AppSpacing.sm),
+              Text(
+                'This can be restored at any time.',
+                style: text.bodyMedium?.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  height: 1.45,
                 ),
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -183,8 +95,8 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: PrimaryButton(
-                      label: 'Confirm',
-                      icon: Icons.check_rounded,
+                      label: 'Apply Fix',
+                      icon: Icons.auto_fix_high_outlined,
                       expanded: true,
                       onPressed: () {
                         Navigator.of(context).pop(

@@ -9,11 +9,14 @@ abstract final class AppSpacing {
   static const double xxl = 32;
   static const double xxxl = 48;
 
-  static const double buttonPaddingH = 20;
-  static const double buttonPaddingV = 12;
-  static const double cardPadding = 20;
+  static const double buttonPaddingH = 16;
+  static const double buttonPaddingV = 10;
+  static const double cardPadding = 16;
   static const double badgePaddingH = 10;
   static const double badgePaddingV = 4;
+
+  /// Desktop command-center content width.
+  static const double desktopMaxWidth = 1200;
 
   /// Compact inline icons (list accents, impact chips).
   static const double iconInline = 18;

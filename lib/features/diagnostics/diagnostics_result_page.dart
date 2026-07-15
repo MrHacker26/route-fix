@@ -5,11 +5,13 @@ import 'package:flutter/material.dart';
 import '../../application/diagnostics/diagnostics_coordinator.dart';
 import '../../design_system/design_system.dart';
 import '../../di/app_services.dart';
+import '../../domain/autofix/auto_fix_service.dart';
 import '../../domain/autofix/fix_provider.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import 'diagnostics_result_view_data.dart';
 import 'human_message.dart';
 import 'recommended_fix_card.dart';
+import 'restore_default_card.dart';
 
 /// Diagnostics result report powered by a real [DiagnosticReport].
 class DiagnosticsResultPage extends StatefulWidget {
@@ -122,7 +124,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
   List<Widget> _staggered(List<Widget> children) {
     final widgets = <Widget>[];
     for (var i = 0; i < children.length; i++) {
-      if (i > 0) widgets.add(const SizedBox(height: AppSpacing.xl));
+      if (i > 0) widgets.add(const SizedBox(height: AppSpacing.md));
       final start = (0.04 + i * 0.07).clamp(0.0, 0.7);
       final end = (start + 0.28).clamp(0.0, 1.0);
       widgets.add(
@@ -158,16 +160,18 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
         child: SafeArea(
           child: Center(
             child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 840),
+              constraints: const BoxConstraints(
+                maxWidth: AppSpacing.desktopMaxWidth,
+              ),
               child: CustomScrollView(
                 physics: const BouncingScrollPhysics(),
                 slivers: [
                   SliverPadding(
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.xl,
-                      AppSpacing.lg,
+                      AppSpacing.md,
                       AppSpacing.xl,
-                      AppSpacing.xxxl,
+                      AppSpacing.xxl,
                     ),
                     sliver: SliverList(
                       delegate: SliverChildListDelegate([
@@ -197,14 +201,19 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text('Results', style: text.headlineSmall),
+                                    Text(
+                                      'Results',
+                                      style: text.titleLarge?.copyWith(
+                                        fontWeight: FontWeight.w600,
+                                      ),
+                                    ),
                                     Text(
                                       _loading
                                           ? 'Listening to your network…'
                                           : _error != null
                                               ? 'Couldn’t complete this check'
                                               : '${data?.timestampLabel ?? ''} · RouteFix',
-                                      style: text.bodySmall?.copyWith(
+                                      style: text.labelSmall?.copyWith(
                                         color: AppColors.onSurfaceVariant,
                                       ),
                                     ),
@@ -215,9 +224,9 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                                 label: _loading
                                     ? 'Investigating'
                                     : _error != null
-                                        ? 'Needs attention'
+                                        ? 'Needs Attention'
                                         : _partial
-                                            ? 'Needs attention'
+                                            ? 'Needs Attention'
                                             : 'Healthy',
                                 tone: _loading
                                     ? StatusBadgeTone.info
@@ -227,19 +236,25 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                                             ? StatusBadgeTone.warning
                                             : StatusBadgeTone.success,
                               ),
+                              const SizedBox(width: AppSpacing.sm),
+                              SecondaryButton(
+                                label: 'Done',
+                                icon: Icons.check_rounded,
+                                onPressed: _loading ? null : _handleClose,
+                              ),
                             ],
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.xl),
+                        const SizedBox(height: AppSpacing.md),
                         if (_loading) ...[
                           const _LoadingCard(
                             label: 'Checking how healthy your routes feel…',
                           ),
-                          const SizedBox(height: AppSpacing.md),
+                          const SizedBox(height: AppSpacing.sm),
                           const _LoadingCard(
                             label: 'Comparing everyday developer paths…',
                           ),
-                          const SizedBox(height: AppSpacing.md),
+                          const SizedBox(height: AppSpacing.sm),
                           const _LoadingCard(
                             label: 'Preparing a calm recommendation…',
                           ),
@@ -252,29 +267,27 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                         ] else if (data != null) ...[
                           ..._staggered([
                             _HealthSection(data: data),
+                            if (data.networkMetrics.isNotEmpty)
+                              _NetworkSnapshotSection(
+                                metrics: data.networkMetrics,
+                              ),
                             _ProblemSection(problems: data.problems),
                             _ImpactSection(impacts: data.serviceImpacts),
                             _RecommendationSection(
                               primary: data.primaryFix,
                               secondary: data.secondaryFixes,
                               fixProvider: AppServices.fixProvider,
+                              autoFix: AppServices.autoFix,
                               onRerunDiagnostics: _loading ? null : _load,
+                              onApplied: () {
+                                if (mounted) setState(() {});
+                              },
                             ),
                             _TechnicalDetailsSection(
                               details: data.technicalDetails,
                             ),
                           ]),
                         ],
-                        const SizedBox(height: AppSpacing.xxl),
-                        SizedBox(
-                          width: double.infinity,
-                          child: PrimaryButton(
-                            label: 'Done',
-                            icon: Icons.check_rounded,
-                            expanded: true,
-                            onPressed: _loading ? null : _handleClose,
-                          ),
-                        ),
                       ]),
                     ),
                   ),
@@ -326,7 +339,8 @@ class _SectionEyebrow extends StatelessWidget {
       label,
       style: AppTypography.textTheme.labelMedium?.copyWith(
         color: AppColors.onSurfaceMuted,
-        letterSpacing: 0.3,
+        letterSpacing: 0.2,
+        fontWeight: FontWeight.w600,
       ),
     );
   }
@@ -430,46 +444,38 @@ class _HealthSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const _SectionEyebrow('Health'),
-        const SizedBox(height: AppSpacing.sm),
+        const _SectionEyebrow('Health Summary'),
+        const SizedBox(height: AppSpacing.xs),
         GlassCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Semantics(
                     label: 'Health score $score of 100',
                     child: SizedBox(
-                      width: AppSpacing.healthRing,
-                      height: AppSpacing.healthRing,
+                      width: 72,
+                      height: 72,
                       child: TweenAnimationBuilder<double>(
                         tween: Tween(begin: 0, end: score / 100),
-                        duration: const Duration(milliseconds: 960),
+                        duration: const Duration(milliseconds: 700),
                         curve: Curves.easeOutCubic,
                         builder: (context, value, _) {
                           return CustomPaint(
                             painter: _ScoreRingPainter(progress: value),
                             child: Center(
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '$score',
-                                    style: text.headlineMedium?.copyWith(
-                                      letterSpacing: -1.2,
-                                      fontFeatures: const [
-                                        FontFeature.tabularFigures(),
-                                      ],
-                                    ),
-                                  ),
-                                  Text(
-                                    'Health',
-                                    style: text.labelSmall?.copyWith(
-                                      color: AppColors.onSurfaceVariant,
-                                    ),
-                                  ),
-                                ],
+                              child: Text(
+                                '$score',
+                                style: text.titleLarge?.copyWith(
+                                  letterSpacing: -1,
+                                  fontWeight: FontWeight.w600,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures(),
+                                  ],
+                                ),
                               ),
                             ),
                           );
@@ -477,48 +483,46 @@ class _HealthSection extends StatelessWidget {
                       ),
                     ),
                   ),
-                  const SizedBox(width: AppSpacing.lg),
+                  const SizedBox(width: AppSpacing.md),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                data.scoreLabel,
-                                style: text.titleMedium,
-                              ),
-                            ),
-                            StatusBadge(
-                              label: HumanMessage.confidenceBadge(
-                                data.confidence,
-                              ),
-                              tone: DiagnosticsResultViewData.toneForConfidence(
-                                data.confidence,
-                              ),
-                            ),
-                          ],
+                        _ResultMetaRow(
+                          label: 'Health Score',
+                          value: '$score',
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        _ResultMetaRow(
+                          label: 'Overall Status',
+                          value: data.scoreLabel,
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        _ResultMetaRow(
+                          label: 'Confidence',
+                          value: HumanMessage.confidenceBadge(data.confidence),
+                        ),
+                        const SizedBox(height: AppSpacing.xxs),
+                        _ResultMetaRow(
+                          label: 'Last Scan',
+                          value: data.timestampLabel,
                         ),
                         const SizedBox(height: AppSpacing.sm),
                         Text(
                           data.scoreSummary,
-                          style: text.bodyMedium?.copyWith(
+                          style: text.bodySmall?.copyWith(
                             color: AppColors.onSurfaceVariant,
-                            height: 1.5,
+                            height: 1.35,
                           ),
                         ),
-                        const SizedBox(height: AppSpacing.md),
-                        Semantics(
-                          label: 'Health progress $score percent',
-                          child: ClipRRect(
-                            borderRadius: AppRadius.pill,
-                            child: LinearProgressIndicator(
-                              value: score / 100,
-                              minHeight: AppSpacing.healthBar,
-                              backgroundColor: AppColors.surfaceHighest,
-                              color: barColor,
-                            ),
+                        const SizedBox(height: AppSpacing.sm),
+                        ClipRRect(
+                          borderRadius: AppRadius.pill,
+                          child: LinearProgressIndicator(
+                            value: score / 100,
+                            minHeight: AppSpacing.healthBar,
+                            backgroundColor: AppColors.surfaceHighest,
+                            color: barColor,
                           ),
                         ),
                       ],
@@ -526,30 +530,70 @@ class _HealthSection extends StatelessWidget {
                   ),
                 ],
               ),
-              if (data.networkMetrics.isNotEmpty) ...[
-                const SizedBox(height: AppSpacing.lg),
-                const Divider(height: 1, color: AppColors.outlineSubtle),
-                const SizedBox(height: AppSpacing.lg),
-                Text(
-                  'Network path',
-                  style: text.titleSmall,
-                ),
-                const SizedBox(height: AppSpacing.sm),
-                for (var i = 0; i < data.networkMetrics.length; i++) ...[
-                  if (i > 0) ...[
-                    Padding(
-                      padding: const EdgeInsets.symmetric(
-                        vertical: AppSpacing.xxs,
-                      ),
-                      child: Icon(
-                        Icons.south_rounded,
-                        size: 14,
-                        color: AppColors.onSurfaceMuted,
-                      ),
-                    ),
-                  ],
-                  _MetricRow(metric: data.networkMetrics[i]),
-                ],
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _ResultMetaRow extends StatelessWidget {
+  const _ResultMetaRow({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    return Row(
+      children: [
+        SizedBox(
+          width: 108,
+          child: Text(
+            label,
+            style: text.labelSmall?.copyWith(
+              color: AppColors.onSurfaceMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            style: text.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _NetworkSnapshotSection extends StatelessWidget {
+  const _NetworkSnapshotSection({required this.metrics});
+
+  final List<NetworkMetricView> metrics;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const _SectionEyebrow('Network Snapshot'),
+        const SizedBox(height: AppSpacing.xs),
+        GlassCard(
+          padding: const EdgeInsets.all(AppSpacing.md),
+          child: Column(
+            children: [
+              for (var i = 0; i < metrics.length; i++) ...[
+                if (i > 0)
+                  const Divider(height: 1, color: AppColors.outlineSubtle),
+                _MetricRow(metric: metrics[i]),
               ],
             ],
           ),
@@ -559,14 +603,22 @@ class _HealthSection extends StatelessWidget {
   }
 }
 
-class _MetricRow extends StatelessWidget {
+class _MetricRow extends StatefulWidget {
   const _MetricRow({required this.metric});
 
   final NetworkMetricView metric;
 
   @override
+  State<_MetricRow> createState() => _MetricRowState();
+}
+
+class _MetricRowState extends State<_MetricRow> {
+  var _hovered = false;
+
+  @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
+    final metric = widget.metric;
     final accent = switch (metric.tone) {
       StatusBadgeTone.success => AppColors.success,
       StatusBadgeTone.warning => AppColors.warning,
@@ -575,54 +627,59 @@ class _MetricRow extends StatelessWidget {
       StatusBadgeTone.neutral => AppColors.onSurfaceVariant,
     };
 
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLow.withValues(alpha: 0.55),
-        borderRadius: AppRadius.mdAll,
-        border: Border.all(color: AppColors.outlineSubtle),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: accent.withValues(alpha: 0.14),
-              borderRadius: AppRadius.smAll,
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.xs,
+          horizontal: AppSpacing.xxs,
+        ),
+        decoration: BoxDecoration(
+          color: _hovered
+              ? AppColors.surfaceHigh.withValues(alpha: 0.45)
+              : Colors.transparent,
+          borderRadius: AppRadius.xsAll,
+        ),
+        child: Row(
+          children: [
+            Icon(metric.icon, size: AppSpacing.iconInline, color: accent),
+            const SizedBox(width: AppSpacing.sm),
+            SizedBox(
+              width: 56,
+              child: Text(
+                metric.title,
+                style: text.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
             ),
-            child: Icon(
-              metric.icon,
-              size: AppSpacing.iconInline,
-              color: accent,
-            ),
-          ),
-          const SizedBox(width: AppSpacing.sm),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(metric.title, style: text.titleSmall),
-                Text(
-                  metric.detail,
-                  style: text.bodySmall?.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                    height: 1.35,
-                  ),
+            Expanded(
+              child: Text(
+                metric.value,
+                overflow: TextOverflow.ellipsis,
+                style: text.bodySmall?.copyWith(
+                  fontFamily: 'Menlo',
+                  fontFamilyFallback: const ['Consolas', 'monospace'],
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  fontWeight: FontWeight.w500,
                 ),
-              ],
+              ),
             ),
-          ),
-          Text(
-            metric.value,
-            style: text.titleSmall?.copyWith(
-              fontFamily: 'Menlo',
-              fontFamilyFallback: const ['monospace'],
-              fontFeatures: const [FontFeature.tabularFigures()],
+            const SizedBox(width: AppSpacing.sm),
+            Flexible(
+              child: Text(
+                metric.detail,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: text.labelSmall?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                ),
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -825,17 +882,22 @@ class _RecommendationSection extends StatelessWidget {
     required this.primary,
     required this.secondary,
     required this.fixProvider,
+    required this.autoFix,
     this.onRerunDiagnostics,
+    this.onApplied,
   });
 
   final RecommendedFixView? primary;
   final List<RecommendedFixView> secondary;
   final FixProvider fixProvider;
+  final AutoFixService autoFix;
   final VoidCallback? onRerunDiagnostics;
+  final VoidCallback? onApplied;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
+    final showRestore = autoFix.appliedFixes.isNotEmpty;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -862,7 +924,9 @@ class _RecommendationSection extends StatelessWidget {
           RecommendedFixCard(
             fix: primary!,
             fixProvider: fixProvider,
+            autoFix: autoFix,
             onRerunDiagnostics: onRerunDiagnostics,
+            onApplied: onApplied,
           ),
           if (secondary.isNotEmpty) ...[
             const SizedBox(height: AppSpacing.lg),
@@ -880,11 +944,23 @@ class _RecommendationSection extends StatelessWidget {
               RecommendedFixCard(
                 fix: secondary[i],
                 fixProvider: fixProvider,
+                autoFix: autoFix,
                 onRerunDiagnostics: onRerunDiagnostics,
+                onApplied: onApplied,
                 compact: true,
               ),
             ],
           ],
+        ],
+        if (showRestore) ...[
+          const SizedBox(height: AppSpacing.md),
+          RestoreDefaultCard(
+            autoFix: autoFix,
+            onRestored: () {
+              onApplied?.call();
+              onRerunDiagnostics?.call();
+            },
+          ),
         ],
       ],
     );
@@ -908,12 +984,12 @@ class _TechnicalDetailsSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Details',
+                'Verified',
                 style: AppTypography.textTheme.titleMedium,
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Stage timings, addresses, and rule evidence.',
+                'Grouped by DNS · TCP · TLS · HTTP · Rules.',
                 style: AppTypography.textTheme.bodySmall?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.4,
@@ -929,78 +1005,144 @@ class _TechnicalDetailsSection extends StatelessWidget {
   }
 }
 
-class _TechnicalExpander extends StatelessWidget {
+class _TechnicalExpander extends StatefulWidget {
   const _TechnicalExpander({required this.details});
 
   final List<TechnicalDetailView> details;
+
+  @override
+  State<_TechnicalExpander> createState() => _TechnicalExpanderState();
+}
+
+class _TechnicalExpanderState extends State<_TechnicalExpander>
+    with SingleTickerProviderStateMixin {
+  var _expanded = false;
+  late final AnimationController _chevron;
+
+  @override
+  void initState() {
+    super.initState();
+    _chevron = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+  }
+
+  @override
+  void dispose() {
+    _chevron.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded) {
+      _chevron.forward();
+    } else {
+      _chevron.reverse();
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
     final mono = text.bodySmall?.copyWith(
       fontFamily: 'Menlo',
-      fontFamilyFallback: const ['monospace'],
+      fontFamilyFallback: const ['Consolas', 'monospace'],
       color: AppColors.onSurfaceVariant,
       height: 1.45,
     );
-    return Theme(
-      data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
-      child: Material(
-        color: Colors.transparent,
-        child: ExpansionTile(
-        tilePadding: EdgeInsets.zero,
-        childrenPadding: const EdgeInsets.only(bottom: AppSpacing.xs),
-        title: Text(
-          'View technical details',
-          style: text.titleSmall?.copyWith(color: AppColors.primary),
+    final details = widget.details;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          onTap: _toggle,
+          borderRadius: AppRadius.xsAll,
+          hoverColor: AppColors.surfaceHigh.withValues(alpha: 0.4),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'View technical details',
+                    style: text.titleSmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                RotationTransition(
+                  turns: Tween<double>(begin: 0, end: 0.5).animate(
+                    CurvedAnimation(
+                      parent: _chevron,
+                      curve: Curves.easeOutCubic,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.expand_more_rounded,
+                    size: AppSpacing.iconRow,
+                    color: _expanded
+                        ? AppColors.primary
+                        : AppColors.onSurfaceMuted,
+                  ),
+                ),
+              ],
+            ),
+          ),
         ),
-        iconColor: AppColors.primary,
-        collapsedIconColor: AppColors.onSurfaceMuted,
-        children: [
-          if (details.isEmpty)
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'No details for this run.',
-                style: text.bodySmall?.copyWith(
-                  color: AppColors.onSurfaceMuted,
-                ),
-              ),
-            )
-          else
-            for (final detail in details)
-              if (detail.label.startsWith('—'))
-                Padding(
-                  padding: const EdgeInsets.only(
-                    top: AppSpacing.sm,
-                    bottom: AppSpacing.xs,
-                  ),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      detail.label.replaceAll('—', '').trim(),
-                      style: text.labelMedium?.copyWith(
-                        color: AppColors.onSurface,
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(top: AppSpacing.sm),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (details.isEmpty)
+                  Text(
+                    'No details for this run.',
+                    style: text.bodySmall?.copyWith(
+                      color: AppColors.onSurfaceMuted,
+                    ),
+                  )
+                else
+                  for (final detail in details)
+                    if (detail.label.startsWith('—'))
+                      Padding(
+                        padding: const EdgeInsets.only(
+                          top: AppSpacing.sm,
+                          bottom: AppSpacing.xs,
+                        ),
+                        child: Text(
+                          detail.label.replaceAll('—', '').trim(),
+                          style: text.labelMedium?.copyWith(
+                            color: AppColors.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      )
+                    else
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+                        child: SelectableText(
+                          detail.value.isEmpty
+                              ? detail.label
+                              : '${detail.label}: ${detail.value}',
+                          style: mono,
+                        ),
                       ),
-                    ),
-                  ),
-                )
-              else
-                Padding(
-                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: SelectableText(
-                      detail.value.isEmpty
-                          ? detail.label
-                          : '${detail.label}: ${detail.value}',
-                      style: mono,
-                    ),
-                  ),
-                ),
-        ],
-      ),
-      ),
+              ],
+            ),
+          ),
+          crossFadeState: _expanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 180),
+          sizeCurve: Curves.easeOutCubic,
+        ),
+      ],
     );
   }
 }

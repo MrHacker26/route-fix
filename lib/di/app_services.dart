@@ -1,4 +1,5 @@
 import '../application/diagnostics/diagnostics_coordinator.dart';
+import '../data/autofix/adapters/auto_fix_provider_adapter.dart';
 import '../data/autofix/platform_fix_provider_factory.dart';
 import '../data/services/cloudflare/dart_io_cloudflare_diagnostics_service.dart';
 import '../data/services/dns/dart_io_dns_lookup_service.dart';
@@ -6,6 +7,7 @@ import '../data/services/github/dart_io_github_diagnostics_service.dart';
 import '../data/services/ipv4/dart_io_ipv4_connectivity_service.dart';
 import '../data/services/ipv6/dart_io_ipv6_connectivity_service.dart';
 import '../data/services/pypi/dart_io_pypi_diagnostics_service.dart';
+import '../domain/autofix/auto_fix_service.dart';
 import '../domain/autofix/fix_provider.dart';
 import '../domain/diagnosis/engine/diagnosis_engine.dart';
 
@@ -13,6 +15,7 @@ import '../domain/diagnosis/engine/diagnosis_engine.dart';
 abstract final class AppServices {
   static DiagnosticsCoordinator? _diagnostics;
   static FixProvider? _fixProvider;
+  static AutoFixService? _autoFix;
 
   static DiagnosticsCoordinator get diagnostics {
     return _diagnostics ??= DefaultDiagnosticsCoordinator(
@@ -26,10 +29,14 @@ abstract final class AppServices {
     );
   }
 
-  /// Auto Fix adapter for the current OS — [FixProvider] only; never runs fixes
-  /// until the application explicitly calls [FixProvider.apply].
+  /// Production Auto Fix orchestration (apply / restore).
+  static AutoFixService get autoFix {
+    return _autoFix ??= createAutoFixService();
+  }
+
+  /// Catalog bridge for recommendations — shares [autoFix] for apply.
   static FixProvider get fixProvider {
-    return _fixProvider ??= const PlatformFixProviderFactory().create();
+    return _fixProvider ??= AutoFixProviderAdapter(service: autoFix);
   }
 
   /// Test / preview override.
@@ -42,8 +49,15 @@ abstract final class AppServices {
     _fixProvider = provider;
   }
 
+  /// Test / preview override.
+  static set autoFix(AutoFixService service) {
+    _autoFix = service;
+    _fixProvider = AutoFixProviderAdapter(service: service);
+  }
+
   static void reset() {
     _diagnostics = null;
     _fixProvider = null;
+    _autoFix = null;
   }
 }

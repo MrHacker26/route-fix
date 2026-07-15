@@ -1,15 +1,16 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../../application/diagnostics/diagnostics_coordinator.dart';
 import '../../design_system/design_system.dart';
 import '../../di/app_services.dart';
 import '../diagnostics/diagnostics_page.dart';
-import '../diagnostics/human_message.dart';
+import '../diagnostics/diagnostics_result_page.dart';
 import 'dashboard_view_data.dart';
 
-/// Premium network health report — powered by [DiagnosticsCoordinator].
+/// Desktop command center — powered by [DiagnosticsCoordinator].
 class DashboardPage extends StatefulWidget {
   const DashboardPage({
     super.key,
@@ -40,7 +41,7 @@ class _DashboardPageState extends State<DashboardPage>
     super.initState();
     _entrance = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 700),
     )..forward();
     _load();
   }
@@ -92,15 +93,15 @@ class _DashboardPageState extends State<DashboardPage>
     return 'Something went wrong while running diagnostics. Please try again.';
   }
 
-  void _openDiagnostics() {
+  void _openScan() {
     if (widget.onStartDiagnosis != null) {
       widget.onStartDiagnosis!();
       return;
     }
     Navigator.of(context).push(
       PageRouteBuilder<void>(
-        transitionDuration: const Duration(milliseconds: 420),
-        reverseTransitionDuration: const Duration(milliseconds: 320),
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 200),
         pageBuilder: (context, animation, secondary) {
           return FadeTransition(
             opacity: CurvedAnimation(
@@ -114,164 +115,219 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
+  void _openResults() {
+    Navigator.of(context).push(
+      PageRouteBuilder<void>(
+        transitionDuration: const Duration(milliseconds: 280),
+        reverseTransitionDuration: const Duration(milliseconds: 200),
+        pageBuilder: (context, animation, secondary) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeOutCubic,
+            ),
+            child: const DiagnosticsResultPage(),
+          );
+        },
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    final text = AppTypography.textTheme;
+    final width = MediaQuery.sizeOf(context).width;
+    final wide = width >= 980;
     final data = _data;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: DecoratedBox(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              AppColors.atmosphere,
-              AppColors.background,
-              AppColors.background,
-            ],
-            stops: [0.0, 0.35, 1.0],
-          ),
-        ),
-        child: SafeArea(
-          child: Center(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 880),
-              child: CustomScrollView(
-                physics: const BouncingScrollPhysics(),
-                slivers: [
-                  SliverPadding(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.xl,
-                      AppSpacing.xl,
-                      AppSpacing.xl,
-                      AppSpacing.xxxl,
-                    ),
-                    sliver: SliverList(
-                      delegate: SliverChildListDelegate([
-                        _FadeSlide(
-                          animation: _entrance,
-                          interval: const Interval(0.0, 0.35),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            children: [
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      'RouteFix',
-                                      style: text.labelLarge?.copyWith(
-                                        color: AppColors.primary,
-                                        letterSpacing: 0.4,
+    return CallbackShortcuts(
+      bindings: {
+        const SingleActivator(LogicalKeyboardKey.keyR, meta: true): _load,
+        const SingleActivator(LogicalKeyboardKey.keyR, control: true): _load,
+      },
+      child: Focus(
+        autofocus: true,
+        child: Scaffold(
+          backgroundColor: AppColors.background,
+          body: DecoratedBox(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  AppColors.atmosphere,
+                  AppColors.background,
+                  AppColors.background,
+                ],
+                stops: [0.0, 0.28, 1.0],
+              ),
+            ),
+            child: SafeArea(
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(
+                    maxWidth: AppSpacing.desktopMaxWidth,
+                  ),
+                  child: Column(
+                    children: [
+                      _DesktopToolbar(
+                        loading: _loading,
+                        error: _error != null,
+                        healthLabel: data?.healthLabel,
+                        healthTone: data?.healthTone,
+                        scannedAt: data?.scannedAtLabel,
+                        onRunScan: _loading ? null : _openScan,
+                        onRefresh: _loading ? null : _load,
+                      ),
+                      Expanded(
+                        child: CustomScrollView(
+                          physics: const BouncingScrollPhysics(),
+                          slivers: [
+                            SliverPadding(
+                              padding: const EdgeInsets.fromLTRB(
+                                AppSpacing.xl,
+                                AppSpacing.sm,
+                                AppSpacing.xl,
+                                AppSpacing.xl,
+                              ),
+                              sliver: SliverList(
+                                delegate: SliverChildListDelegate([
+                                  if (_loading)
+                                    _CommandCenterLoading(wide: wide)
+                                  else if (_error != null)
+                                    _ErrorBanner(
+                                      message: _error!,
+                                      onRetry: _load,
+                                    )
+                                  else if (data != null) ...[
+                                    _FadeIn(
+                                      animation: _entrance,
+                                      interval: const Interval(0.0, 0.45),
+                                      child: wide
+                                          ? IntrinsicHeight(
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Expanded(
+                                                    flex: 4,
+                                                    child: _HealthSummaryCard(
+                                                      data: data,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(
+                                                    width: AppSpacing.sm,
+                                                  ),
+                                                  Expanded(
+                                                    flex: 6,
+                                                    child: _NetworkSnapshotCard(
+                                                      rows: data.networkRows,
+                                                      onOpenResults:
+                                                          _openResults,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : Column(
+                                              children: [
+                                                _HealthSummaryCard(data: data),
+                                                const SizedBox(
+                                                  height: AppSpacing.sm,
+                                                ),
+                                                _NetworkSnapshotCard(
+                                                  rows: data.networkRows,
+                                                  onOpenResults: _openResults,
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    _FadeIn(
+                                      animation: _entrance,
+                                      interval: const Interval(0.12, 0.55),
+                                      child: wide
+                                          ? IntrinsicHeight(
+                                              child: Row(
+                                                crossAxisAlignment:
+                                                    CrossAxisAlignment.stretch,
+                                                children: [
+                                                  Expanded(
+                                                    flex: 6,
+                                                    child:
+                                                        _RecommendationCard(
+                                                      title: data
+                                                          .recommendationTitle,
+                                                      detail: data
+                                                          .recommendationDetail,
+                                                      tone: data
+                                                          .recommendationTone,
+                                                      action: data
+                                                          .recommendationAction,
+                                                      lastVerified:
+                                                          data.scannedAtLabel,
+                                                    ),
+                                                  ),
+                                                  const SizedBox(
+                                                    width: AppSpacing.sm,
+                                                  ),
+                                                  Expanded(
+                                                    flex: 4,
+                                                    child: _RecentScanCard(
+                                                      scan: data.recentScan,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            )
+                                          : Column(
+                                              children: [
+                                                _RecommendationCard(
+                                                  title: data
+                                                      .recommendationTitle,
+                                                  detail: data
+                                                      .recommendationDetail,
+                                                  tone: data
+                                                      .recommendationTone,
+                                                  action: data
+                                                      .recommendationAction,
+                                                  lastVerified:
+                                                      data.scannedAtLabel,
+                                                ),
+                                                const SizedBox(
+                                                  height: AppSpacing.sm,
+                                                ),
+                                                _RecentScanCard(
+                                                  scan: data.recentScan,
+                                                ),
+                                              ],
+                                            ),
+                                    ),
+                                    const SizedBox(height: AppSpacing.sm),
+                                    _FadeIn(
+                                      animation: _entrance,
+                                      interval: const Interval(0.22, 0.65),
+                                      child: _DeveloperServicesCard(
+                                        services: data.services,
                                       ),
                                     ),
-                                    const SizedBox(height: AppSpacing.xxs),
-                                    Text(
-                                      'Health report',
-                                      style: text.headlineMedium,
-                                    ),
-                                    const SizedBox(height: AppSpacing.xs),
-                                    Text(
-                                      'A calm snapshot of how your routes feel right now.',
-                                      style: text.bodyMedium?.copyWith(
-                                        color: AppColors.onSurfaceVariant,
+                                    const SizedBox(height: AppSpacing.sm),
+                                    _FadeIn(
+                                      animation: _entrance,
+                                      interval: const Interval(0.32, 0.75),
+                                      child: _TechnicalDetailsCard(
+                                        groups: data.technicalGroups,
                                       ),
                                     ),
                                   ],
-                                ),
+                                ]),
                               ),
-                              StatusBadge(
-                                label: _loading
-                                    ? 'Scanning'
-                                    : _error != null
-                                        ? 'Error'
-                                        : 'Live',
-                                tone: _loading
-                                    ? StatusBadgeTone.info
-                                    : _error != null
-                                        ? StatusBadgeTone.error
-                                        : StatusBadgeTone.success,
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
-                        const SizedBox(height: AppSpacing.xxl),
-                        if (_loading) ...[
-                          const _LoadingSection(
-                            title: 'Overall health',
-                            message: 'Running diagnostic checks…',
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
-                          const _LoadingSection(
-                            title: 'Connection status',
-                            message: 'Checking local paths…',
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
-                          const _LoadingSection(
-                            title: 'Quick summary',
-                            message: 'Collecting service results…',
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
-                          const _LoadingSection(
-                            title: 'Recent scan',
-                            message: 'Almost done…',
-                          ),
-                        ] else if (_error != null) ...[
-                          _FadeSlide(
-                            animation: _entrance,
-                            interval: const Interval(0.08, 0.55),
-                            child: _ErrorSection(
-                              message: _error!,
-                              onRetry: _load,
-                            ),
-                          ),
-                        ] else if (data != null) ...[
-                          _FadeSlide(
-                            animation: _entrance,
-                            interval: const Interval(0.08, 0.5),
-                            child: _HealthScoreSection(data: data),
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
-                          _FadeSlide(
-                            animation: _entrance,
-                            interval: const Interval(0.16, 0.58),
-                            child: _ConnectionStatusSection(
-                              connection: data.connection,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
-                          _FadeSlide(
-                            animation: _entrance,
-                            interval: const Interval(0.24, 0.66),
-                            child: _QuickSummarySection(items: data.summary),
-                          ),
-                          const SizedBox(height: AppSpacing.xl),
-                          _FadeSlide(
-                            animation: _entrance,
-                            interval: const Interval(0.32, 0.74),
-                            child: _RecentScanSection(scan: data.recentScan),
-                          ),
-                        ],
-                        const SizedBox(height: AppSpacing.xxl),
-                        _FadeSlide(
-                          animation: _entrance,
-                          interval: const Interval(0.4, 0.85),
-                          child: SizedBox(
-                            width: double.infinity,
-                            child: PrimaryButton(
-                              label: 'Start diagnostics',
-                              icon: Icons.radar_rounded,
-                              expanded: true,
-                              onPressed: _loading ? null : _openDiagnostics,
-                            ),
-                          ),
-                        ),
-                      ]),
-                    ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
               ),
             ),
           ),
@@ -281,8 +337,8 @@ class _DashboardPageState extends State<DashboardPage>
   }
 }
 
-class _FadeSlide extends StatelessWidget {
-  const _FadeSlide({
+class _FadeIn extends StatelessWidget {
+  const _FadeIn({
     required this.animation,
     required this.interval,
     required this.child,
@@ -295,12 +351,11 @@ class _FadeSlide extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final curved = CurvedAnimation(parent: animation, curve: interval);
-
     return FadeTransition(
       opacity: curved,
       child: SlideTransition(
         position: Tween<Offset>(
-          begin: const Offset(0, 0.04),
+          begin: const Offset(0, 0.02),
           end: Offset.zero,
         ).animate(CurvedAnimation(parent: curved, curve: Curves.easeOutCubic)),
         child: child,
@@ -309,72 +364,182 @@ class _FadeSlide extends StatelessWidget {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({
-    required this.title,
-    this.trailing,
+class _DesktopToolbar extends StatelessWidget {
+  const _DesktopToolbar({
+    required this.loading,
+    required this.error,
+    required this.onRunScan,
+    required this.onRefresh,
+    this.healthLabel,
+    this.healthTone,
+    this.scannedAt,
   });
 
-  final String title;
-  final Widget? trailing;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      children: [
-        Text(title, style: AppTypography.textTheme.titleMedium),
-        const Spacer(),
-        ?trailing,
-      ],
-    );
-  }
-}
-
-class _LoadingSection extends StatelessWidget {
-  const _LoadingSection({
-    required this.title,
-    required this.message,
-  });
-
-  final String title;
-  final String message;
+  final bool loading;
+  final bool error;
+  final String? healthLabel;
+  final StatusBadgeTone? healthTone;
+  final String? scannedAt;
+  final VoidCallback? onRunScan;
+  final VoidCallback? onRefresh;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
 
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(title: title),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final showTimestamp =
+            scannedAt != null && !loading && constraints.maxWidth >= 860;
+
+        return Container(
+          height: 48,
+          padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xl),
+          decoration: const BoxDecoration(
+            border: Border(
+              bottom: BorderSide(color: AppColors.outlineSubtle),
+            ),
+          ),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(
-                width: AppSpacing.iconLead,
-                height: AppSpacing.iconLead,
-                child: CircularProgressIndicator(strokeWidth: 2),
+              ClipRRect(
+                borderRadius: AppRadius.xsAll,
+                child: Image.asset(
+                  AppAssets.appIcon,
+                  width: 24,
+                  height: 24,
+                  filterQuality: FilterQuality.medium,
+                ),
               ),
               const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  message,
-                  style: text.bodyMedium?.copyWith(
-                    color: AppColors.onSurfaceVariant,
+              Text(
+                'RouteFix',
+                style: text.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              StatusBadge(
+                label: loading
+                    ? 'Investigating'
+                    : error
+                        ? 'Needs Attention'
+                        : (healthLabel ?? 'Ready'),
+                tone: loading
+                    ? StatusBadgeTone.info
+                    : error
+                        ? StatusBadgeTone.error
+                        : (healthTone ?? StatusBadgeTone.neutral),
+              ),
+              const Spacer(),
+              if (showTimestamp)
+                Text(
+                  'Last scan $scannedAt',
+                  overflow: TextOverflow.ellipsis,
+                  style: text.labelSmall?.copyWith(
+                    color: AppColors.onSurfaceMuted,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              if (showTimestamp) const SizedBox(width: AppSpacing.sm),
+              IconButton(
+                tooltip: 'Refresh',
+                onPressed: onRefresh,
+                icon: const Icon(
+                  Icons.refresh_rounded,
+                  size: AppSpacing.iconInline,
+                ),
+                style: IconButton.styleFrom(
+                  foregroundColor: AppColors.onSurfaceVariant,
+                  hoverColor: AppColors.surfaceHigh,
+                  minimumSize: const Size(32, 32),
+                  padding: EdgeInsets.zero,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: AppRadius.xsAll,
                   ),
                 ),
               ),
+              const SizedBox(width: AppSpacing.xs),
+              SecondaryButton(
+                label: loading ? 'Scanning…' : 'Run Scan',
+                icon: loading ? null : Icons.radar_rounded,
+                onPressed: onRunScan,
+              ),
             ],
           ),
+        );
+      },
+    );
+  }
+}
+
+class _CommandCenterLoading extends StatelessWidget {
+  const _CommandCenterLoading({required this.wide});
+
+  final bool wide;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget card(String title, String message) {
+      return GlassCard(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(title, style: AppTypography.textTheme.titleSmall),
+            const SizedBox(height: AppSpacing.md),
+            Row(
+              children: [
+                const SizedBox(
+                  width: AppSpacing.iconRow,
+                  height: AppSpacing.iconRow,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(width: AppSpacing.sm),
+                Expanded(
+                  child: Text(
+                    message,
+                    style: AppTypography.textTheme.bodyMedium?.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    if (!wide) {
+      return Column(
+        children: [
+          card('Health Summary', 'Checking network health…'),
+          const SizedBox(height: AppSpacing.sm),
+          card('Network Snapshot', 'Measuring paths…'),
+        ],
+      );
+    }
+
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(flex: 4, child: card('Health Summary', 'Checking network health…')),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(flex: 6, child: card('Network Snapshot', 'Measuring paths…')),
         ],
       ),
     );
   }
 }
 
-class _ErrorSection extends StatelessWidget {
-  const _ErrorSection({
+class _ErrorBanner extends StatelessWidget {
+  const _ErrorBanner({
     required this.message,
     required this.onRetry,
   });
@@ -385,27 +550,26 @@ class _ErrorSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-
     return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
         children: [
-          const _SectionHeader(
-            title: 'Unable to load health report',
-            trailing: StatusBadge(
-              label: 'Failed',
-              tone: StatusBadgeTone.error,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Unable to load health report', style: text.titleMedium),
+                const SizedBox(height: AppSpacing.xs),
+                Text(
+                  message,
+                  style: text.bodyMedium?.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                    height: 1.45,
+                  ),
+                ),
+              ],
             ),
           ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            message,
-            style: text.bodyMedium?.copyWith(
-              color: AppColors.onSurfaceVariant,
-              height: 1.5,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.lg),
+          const SizedBox(width: AppSpacing.md),
           SecondaryButton(
             label: 'Try again',
             icon: Icons.refresh_rounded,
@@ -417,8 +581,8 @@ class _ErrorSection extends StatelessWidget {
   }
 }
 
-class _HealthScoreSection extends StatelessWidget {
-  const _HealthScoreSection({required this.data});
+class _HealthSummaryCard extends StatelessWidget {
+  const _HealthSummaryCard({required this.data});
 
   final DashboardViewData data;
 
@@ -426,7 +590,6 @@ class _HealthScoreSection extends StatelessWidget {
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
     final score = data.healthScore;
-    final progress = score / 100;
     final barColor = switch (data.healthTone) {
       StatusBadgeTone.success => AppColors.success,
       StatusBadgeTone.warning => AppColors.warning,
@@ -435,54 +598,100 @@ class _HealthScoreSection extends StatelessWidget {
     };
 
     return GlassCard(
-      child: Row(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _HealthRing(
-            progress: progress,
-            label: '$score',
+          Row(
+            children: [
+              Text(
+                'Health Summary',
+                style: text.labelMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  letterSpacing: 0.2,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              StatusBadge(label: data.healthLabel, tone: data.healthTone),
+            ],
           ),
-          const SizedBox(width: AppSpacing.xl),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _SectionHeader(
-                  title: 'Overall health',
-                  trailing: StatusBadge(
-                    label: data.healthLabel,
-                    tone: data.healthTone,
+          const SizedBox(height: AppSpacing.md),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Semantics(
+                label: 'Health score $score of 100',
+                child: SizedBox(
+                  width: 72,
+                  height: 72,
+                  child: TweenAnimationBuilder<double>(
+                    tween: Tween(begin: 0, end: score / 100),
+                    duration: const Duration(milliseconds: 700),
+                    curve: Curves.easeOutCubic,
+                    builder: (context, value, _) {
+                      return CustomPaint(
+                        painter: _RingPainter(progress: value),
+                        child: Center(
+                          child: Text(
+                            '$score',
+                            style: text.titleLarge?.copyWith(
+                              letterSpacing: -1,
+                              fontWeight: FontWeight.w600,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures(),
+                              ],
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
                 ),
-                const SizedBox(height: AppSpacing.sm),
-                Text(
-                  data.healthDetail,
-                  style: text.bodyMedium?.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                    height: 1.5,
-                  ),
-                ),
-                const SizedBox(height: AppSpacing.md),
-                Semantics(
-                  label: 'Health score $score of 100',
-                  child: ClipRRect(
-                    borderRadius: AppRadius.pill,
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: AppSpacing.healthBar,
-                      backgroundColor: AppColors.surfaceHighest,
-                      color: barColor,
+              ),
+              const SizedBox(width: AppSpacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _HealthMetaRow(label: 'Health Score', value: '$score'),
+                    const SizedBox(height: AppSpacing.xxs),
+                    _HealthMetaRow(
+                      label: 'Overall Status',
+                      value: data.healthLabel,
                     ),
-                  ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    _HealthMetaRow(
+                      label: 'Confidence',
+                      value: data.confidenceLabel,
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    _HealthMetaRow(
+                      label: 'Last Scan',
+                      value: data.scannedAtLabel,
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      data.canStartWorking,
+                      style: text.bodySmall?.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    ClipRRect(
+                      borderRadius: AppRadius.pill,
+                      child: LinearProgressIndicator(
+                        value: score / 100,
+                        minHeight: AppSpacing.healthBar,
+                        backgroundColor: AppColors.surfaceHighest,
+                        color: barColor,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpacing.xs),
-                Text(
-                  HumanMessage.confidenceBadge(data.confidence),
-                  style: text.labelSmall?.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ],
       ),
@@ -490,53 +699,38 @@ class _HealthScoreSection extends StatelessWidget {
   }
 }
 
-class _HealthRing extends StatelessWidget {
-  const _HealthRing({
-    required this.progress,
-    required this.label,
-  });
+class _HealthMetaRow extends StatelessWidget {
+  const _HealthMetaRow({required this.label, required this.value});
 
-  final double progress;
   final String label;
+  final String value;
 
   @override
   Widget build(BuildContext context) {
-    return Semantics(
-      label: 'Health score $label',
-      child: SizedBox(
-        width: AppSpacing.healthRing,
-        height: AppSpacing.healthRing,
-        child: TweenAnimationBuilder<double>(
-          tween: Tween(begin: 0, end: progress),
-          duration: const Duration(milliseconds: 960),
-          curve: Curves.easeOutCubic,
-          builder: (context, value, _) {
-            return CustomPaint(
-              painter: _RingPainter(progress: value),
-              child: Center(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text(
-                      label,
-                      style: AppTypography.textTheme.headlineLarge?.copyWith(
-                        letterSpacing: -1.2,
-                        fontFeatures: const [FontFeature.tabularFigures()],
-                      ),
-                    ),
-                    Text(
-                      'Health',
-                      style: AppTypography.textTheme.labelSmall?.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
+    final text = AppTypography.textTheme;
+    return Row(
+      children: [
+        SizedBox(
+          width: 108,
+          child: Text(
+            label,
+            style: text.labelSmall?.copyWith(
+              color: AppColors.onSurfaceMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
         ),
-      ),
+        Expanded(
+          child: Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            style: text.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
@@ -589,131 +783,58 @@ class _RingPainter extends CustomPainter {
   }
 }
 
-class _ConnectionStatusSection extends StatelessWidget {
-  const _ConnectionStatusSection({required this.connection});
+class _NetworkSnapshotCard extends StatelessWidget {
+  const _NetworkSnapshotCard({
+    required this.rows,
+    required this.onOpenResults,
+  });
 
-  final ConnectionStatusView connection;
+  final List<NetworkSnapshotRow> rows;
+  final VoidCallback onOpenResults;
 
   @override
   Widget build(BuildContext context) {
-    final data = connection;
     final text = AppTypography.textTheme;
-    final iconColor = switch (data.tone) {
-      StatusBadgeTone.success => AppColors.success,
-      StatusBadgeTone.warning => AppColors.warning,
-      StatusBadgeTone.error => AppColors.error,
-      _ => AppColors.primary,
-    };
-    final iconBg = switch (data.tone) {
-      StatusBadgeTone.success => AppColors.successContainer,
-      StatusBadgeTone.warning => AppColors.warningContainer,
-      StatusBadgeTone.error => AppColors.errorContainer,
-      _ => AppColors.primaryContainer,
-    };
 
     return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionHeader(
-            title: 'Connection status',
-            trailing: StatusBadge(
-              label: data.badgeLabel,
-              tone: data.tone,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.md),
           Row(
             children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: iconBg,
-                  borderRadius: AppRadius.mdAll,
-                ),
-                child: Icon(
-                  Icons.wifi_rounded,
-                  color: iconColor,
-                  size: AppSpacing.iconLead,
+              Text(
+                'Network Snapshot',
+                style: text.labelMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  letterSpacing: 0.2,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(data.title, style: text.titleSmall),
-                    Text(
-                      data.subtitle,
-                      style: text.bodySmall,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.lg),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpacing.md),
-            decoration: BoxDecoration(
-              color: AppColors.surfaceLow.withValues(alpha: 0.7),
-              borderRadius: AppRadius.mdAll,
-              border: Border.all(color: AppColors.outlineSubtle),
-            ),
-            child: Row(
-              children: [
-                for (var i = 0; i < data.details.length; i++) ...[
-                  if (i > 0) const SizedBox(width: AppSpacing.md),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          data.details[i].label,
-                          style: text.labelSmall,
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          data.details[i].value,
-                          style: text.titleSmall?.copyWith(
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
-                        ),
-                      ],
-                    ),
+              const Spacer(),
+              TextButton(
+                onPressed: onOpenResults,
+                style: TextButton.styleFrom(
+                  foregroundColor: AppColors.primary,
+                  textStyle: text.labelSmall?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _QuickSummarySection extends StatelessWidget {
-  const _QuickSummarySection({required this.items});
-
-  final List<SummaryItemView> items;
-
-  @override
-  Widget build(BuildContext context) {
-    return GlassCard(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          const _SectionHeader(title: 'Quick summary'),
-          const SizedBox(height: AppSpacing.md),
-          for (var i = 0; i < items.length; i++) ...[
-            if (i > 0) ...[
-              const SizedBox(height: AppSpacing.sm),
-              const Divider(height: 1),
-              const SizedBox(height: AppSpacing.sm),
+                  visualDensity: VisualDensity.compact,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: AppSpacing.xs,
+                    vertical: AppSpacing.xxs,
+                  ),
+                  minimumSize: Size.zero,
+                  tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                ),
+                child: const Text('Full results'),
+              ),
             ],
-            _SummaryRow(item: items[i]),
+          ),
+          const SizedBox(height: AppSpacing.xs),
+          for (var i = 0; i < rows.length; i++) ...[
+            if (i > 0) const Divider(height: 1, color: AppColors.outlineSubtle),
+            _SnapshotRow(row: rows[i]),
           ],
         ],
       ),
@@ -721,96 +842,302 @@ class _QuickSummarySection extends StatelessWidget {
   }
 }
 
-class _SummaryRow extends StatelessWidget {
-  const _SummaryRow({required this.item});
+class _SnapshotRow extends StatefulWidget {
+  const _SnapshotRow({required this.row});
 
-  final SummaryItemView item;
+  final NetworkSnapshotRow row;
+
+  @override
+  State<_SnapshotRow> createState() => _SnapshotRowState();
+}
+
+class _SnapshotRowState extends State<_SnapshotRow> {
+  var _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
+    final row = widget.row;
+    final accent = switch (row.tone) {
+      StatusBadgeTone.success => AppColors.success,
+      StatusBadgeTone.warning => AppColors.warning,
+      StatusBadgeTone.error => AppColors.error,
+      StatusBadgeTone.info => AppColors.primary,
+      StatusBadgeTone.neutral => AppColors.onSurfaceVariant,
+    };
 
-    return Row(
-      children: [
-        Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: AppColors.surfaceHigh,
-            borderRadius: AppRadius.smAll,
-            border: Border.all(color: AppColors.outlineSubtle),
-          ),
-          child: Icon(
-            item.icon,
-            size: AppSpacing.iconRow,
-            color: AppColors.onSurfaceVariant,
-          ),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpacing.xs,
+          horizontal: AppSpacing.xxs,
         ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(item.title, style: text.titleSmall),
-              Text(item.detail, style: text.bodySmall),
-            ],
-          ),
+        decoration: BoxDecoration(
+          color: _hovered
+              ? AppColors.surfaceHigh.withValues(alpha: 0.45)
+              : Colors.transparent,
+          borderRadius: AppRadius.xsAll,
         ),
-        const SizedBox(width: AppSpacing.sm),
-        StatusBadge(label: item.badge, tone: item.tone),
-      ],
+        child: Row(
+          children: [
+            Icon(row.icon, size: AppSpacing.iconInline, color: accent),
+            const SizedBox(width: AppSpacing.sm),
+            SizedBox(
+              width: 56,
+              child: Text(
+                row.title,
+                style: text.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            Expanded(
+              child: Text(
+                row.summary,
+                overflow: TextOverflow.ellipsis,
+                style: text.bodySmall?.copyWith(
+                  fontFamily: 'Menlo',
+                  fontFamilyFallback: const ['Consolas', 'monospace'],
+                  fontFeatures: const [FontFeature.tabularFigures()],
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            Flexible(
+              child: Text(
+                row.explanation,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.right,
+                style: text.labelSmall?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
-class _RecentScanSection extends StatelessWidget {
-  const _RecentScanSection({required this.scan});
+class _RecommendationCard extends StatelessWidget {
+  const _RecommendationCard({
+    required this.title,
+    required this.detail,
+    required this.tone,
+    required this.lastVerified,
+    this.action,
+  });
+
+  final String title;
+  final String detail;
+  final StatusBadgeTone tone;
+  final String lastVerified;
+  final String? action;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    final badgeLabel = switch (tone) {
+      StatusBadgeTone.success => 'Healthy',
+      StatusBadgeTone.neutral => 'Ready',
+      StatusBadgeTone.info => 'Ready',
+      StatusBadgeTone.warning => 'Needs Attention',
+      StatusBadgeTone.error => 'Needs Attention',
+    };
+
+    return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'Recommendation',
+                style: text.labelMedium?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  letterSpacing: 0.2,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const Spacer(),
+              StatusBadge(label: badgeLabel, tone: tone),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            title,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: text.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: AppSpacing.xxs),
+          Text(
+            detail,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+            style: text.bodySmall?.copyWith(
+              color: AppColors.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Last verified · $lastVerified',
+            style: text.labelSmall?.copyWith(
+              color: AppColors.onSurfaceMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          if (action != null) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Row(
+              children: [
+                Icon(
+                  Icons.auto_fix_high_outlined,
+                  size: AppSpacing.iconInline,
+                  color: AppColors.primary,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    'Recommended action · $action',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.labelSmall?.copyWith(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _RecentScanCard extends StatelessWidget {
+  const _RecentScanCard({required this.scan});
 
   final RecentScanView scan;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-
     return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _SectionHeader(
-            title: 'Recent scan',
-            trailing: StatusBadge(
-              label: scan.badgeLabel,
-              tone: scan.tone,
+          Text(
+            'Recent Scan',
+            style: text.labelMedium?.copyWith(
+              color: AppColors.onSurfaceMuted,
+              letterSpacing: 0.2,
+              fontWeight: FontWeight.w600,
             ),
           ),
-          const SizedBox(height: AppSpacing.md),
-          Text(scan.title, style: text.titleLarge),
-          const SizedBox(height: AppSpacing.xxs),
-          Text(
-            scan.timestamp,
-            style: text.bodySmall,
+          const SizedBox(height: AppSpacing.sm),
+          _CompactStat(label: 'Duration', value: scan.duration),
+          const SizedBox(height: AppSpacing.xs),
+          _CompactStat(label: 'Issues', value: '${scan.issuesFound}'),
+          const SizedBox(height: AppSpacing.xs),
+          _CompactStat(label: 'Confidence', value: scan.confidenceLabel),
+          const SizedBox(height: AppSpacing.xs),
+          _CompactStat(label: 'Last scanned', value: scan.scannedAt),
+        ],
+      ),
+    );
+  }
+}
+
+class _CompactStat extends StatelessWidget {
+  const _CompactStat({required this.label, required this.value});
+
+  final String label;
+  final String value;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    return Row(
+      children: [
+        Expanded(
+          child: Text(
+            label,
+            style: text.labelSmall?.copyWith(
+              color: AppColors.onSurfaceMuted,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-          const SizedBox(height: AppSpacing.lg),
-          Row(
-            children: [
-              _ScanStat(
-                label: 'Duration',
-                value: scan.duration,
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              _ScanStat(
-                label: 'Targets',
-                value: '${scan.targets}',
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: _ScanStat(
-                  label: 'Top finding',
-                  value: scan.finding,
-                  compact: false,
-                ),
-              ),
-            ],
+        ),
+        Flexible(
+          child: Text(
+            value,
+            overflow: TextOverflow.ellipsis,
+            textAlign: TextAlign.right,
+            style: text.bodySmall?.copyWith(
+              fontWeight: FontWeight.w600,
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DeveloperServicesCard extends StatelessWidget {
+  const _DeveloperServicesCard({required this.services});
+
+  final List<DeveloperServiceRow> services;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Developer Services',
+            style: text.labelMedium?.copyWith(
+              color: AppColors.onSurfaceMuted,
+              letterSpacing: 0.2,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 900
+                  ? 5
+                  : constraints.maxWidth >= 560
+                      ? 3
+                      : 2;
+              return Wrap(
+                spacing: AppSpacing.sm,
+                runSpacing: AppSpacing.sm,
+                children: [
+                  for (final service in services)
+                    SizedBox(
+                      width: (constraints.maxWidth -
+                              (AppSpacing.sm * (columns - 1))) /
+                          columns,
+                      child: _ServiceTile(service: service),
+                    ),
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -818,42 +1145,227 @@ class _RecentScanSection extends StatelessWidget {
   }
 }
 
-class _ScanStat extends StatelessWidget {
-  const _ScanStat({
-    required this.label,
-    required this.value,
-    this.compact = true,
-  });
+class _ServiceTile extends StatefulWidget {
+  const _ServiceTile({required this.service});
 
-  final String label;
-  final String value;
-  final bool compact;
+  final DeveloperServiceRow service;
+
+  @override
+  State<_ServiceTile> createState() => _ServiceTileState();
+}
+
+class _ServiceTileState extends State<_ServiceTile> {
+  var _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
+    final service = widget.service;
+    final subtitle = service.detail ??
+        (service.lastChecked != null
+            ? 'Checked · ${service.lastChecked}'
+            : 'Not checked in this scan');
 
-    return Container(
-      width: compact ? 108 : null,
-      padding: const EdgeInsets.all(AppSpacing.md),
-      decoration: BoxDecoration(
-        color: AppColors.surfaceLow.withValues(alpha: 0.7),
-        borderRadius: AppRadius.mdAll,
-        border: Border.all(color: AppColors.outlineSubtle),
+    return MouseRegion(
+      onEnter: (_) => setState(() => _hovered = true),
+      onExit: (_) => setState(() => _hovered = false),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.sm,
+          vertical: AppSpacing.xs,
+        ),
+        decoration: BoxDecoration(
+          color: _hovered
+              ? AppColors.surfaceHigh.withValues(alpha: 0.7)
+              : AppColors.surfaceLow.withValues(alpha: 0.65),
+          borderRadius: AppRadius.smAll,
+          border: Border.all(
+            color: _hovered ? AppColors.outline : AppColors.outlineSubtle,
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  service.icon,
+                  size: AppSpacing.iconInline,
+                  color: AppColors.onSurfaceVariant,
+                ),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    service.name,
+                    overflow: TextOverflow.ellipsis,
+                    style: text.titleSmall?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                StatusBadge(
+                  label: service.badgeLabel,
+                  tone: service.tone,
+                  showDot: false,
+                ),
+              ],
+            ),
+            const SizedBox(height: AppSpacing.xxs),
+            Text(
+              subtitle,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: text.labelSmall?.copyWith(
+                color: AppColors.onSurfaceMuted,
+                fontFamily: service.detail != null ? 'Menlo' : null,
+                fontFamilyFallback: service.detail != null
+                    ? const ['Consolas', 'monospace']
+                    : null,
+              ),
+            ),
+          ],
+        ),
       ),
+    );
+  }
+}
+
+class _TechnicalDetailsCard extends StatefulWidget {
+  const _TechnicalDetailsCard({required this.groups});
+
+  final List<TechnicalGroupView> groups;
+
+  @override
+  State<_TechnicalDetailsCard> createState() => _TechnicalDetailsCardState();
+}
+
+class _TechnicalDetailsCardState extends State<_TechnicalDetailsCard>
+    with SingleTickerProviderStateMixin {
+  var _expanded = false;
+  late final AnimationController _chevron;
+
+  @override
+  void initState() {
+    super.initState();
+    _chevron = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 180),
+    );
+  }
+
+  @override
+  void dispose() {
+    _chevron.dispose();
+    super.dispose();
+  }
+
+  void _toggle() {
+    setState(() => _expanded = !_expanded);
+    if (_expanded) {
+      _chevron.forward();
+    } else {
+      _chevron.reverse();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    final mono = text.bodySmall?.copyWith(
+      fontFamily: 'Menlo',
+      fontFamilyFallback: const ['Consolas', 'monospace'],
+      color: AppColors.onSurfaceVariant,
+      height: 1.45,
+    );
+
+    return GlassCard(
+      padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(label, style: text.labelSmall),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: text.titleSmall?.copyWith(
-              height: 1.25,
-              fontFeatures: const [FontFeature.tabularFigures()],
+          InkWell(
+            onTap: _toggle,
+            borderRadius: AppRadius.xsAll,
+            hoverColor: AppColors.surfaceHigh.withValues(alpha: 0.4),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpacing.xxs),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Technical Details',
+                          style: text.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          'DNS · TCP · TLS · HTTP · Rules',
+                          style: text.labelSmall?.copyWith(
+                            color: AppColors.onSurfaceMuted,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  RotationTransition(
+                    turns: Tween<double>(begin: 0, end: 0.5).animate(
+                      CurvedAnimation(
+                        parent: _chevron,
+                        curve: Curves.easeOutCubic,
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.expand_more_rounded,
+                      size: AppSpacing.iconRow,
+                      color: _expanded
+                          ? AppColors.primary
+                          : AppColors.onSurfaceMuted,
+                    ),
+                  ),
+                ],
+              ),
             ),
+          ),
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity),
+            secondChild: Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.sm),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  for (final group in widget.groups) ...[
+                    Text(
+                      group.title,
+                      style: text.labelMedium?.copyWith(
+                        color: AppColors.onSurface,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: AppSpacing.xxs),
+                    for (final line in group.lines)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: AppSpacing.xxs),
+                        child: SelectableText(
+                          '${line.label}: ${line.value}',
+                          style: mono,
+                        ),
+                      ),
+                    const SizedBox(height: AppSpacing.sm),
+                  ],
+                ],
+              ),
+            ),
+            crossFadeState: _expanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 180),
+            sizeCurve: Curves.easeOutCubic,
           ),
         ],
       ),

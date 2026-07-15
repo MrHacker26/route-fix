@@ -15,7 +15,8 @@ abstract base class PlatformFixProvider implements FixProvider {
       kind: FixActionKind.disableIpv6,
       title: 'Prefer IPv4',
       description:
-          'Skip a slow IPv6 path so everyday developer tools can respond faster.',
+          'RouteFix detected an IPv6 routing issue. '
+          'Temporarily preferring IPv4 may improve connectivity on this network.',
       availability: FixAvailability.available,
       supportedPlatforms: {
         FixPlatform.linux,
@@ -26,9 +27,9 @@ abstract base class PlatformFixProvider implements FixProvider {
     ),
     FixAction(
       kind: FixActionKind.enableIpv6,
-      title: 'Turn IPv6 back on',
+      title: 'Restore Default Network Configuration',
       description:
-          'Restore IPv6 if it was switched off and you want dual-stack again.',
+          'Undo Auto Fix changes and restore default network settings.',
       availability: FixAvailability.available,
       supportedPlatforms: {
         FixPlatform.linux,

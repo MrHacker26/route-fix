@@ -5,7 +5,7 @@ import 'package:route_fix/domain/autofix/autofix.dart';
 
 void main() {
   group('PlatformFixProvider catalog', () {
-    const provider = MacOsFixProvider();
+    final provider = MacOsFixProvider();
 
     test('exposes disable/enable IPv6 and future flush/warp actions', () {
       final actions = provider.availableActions();
@@ -27,6 +27,7 @@ void main() {
       final disable =
           actions.firstWhere((a) => a.kind == FixActionKind.disableIpv6);
       expect(disable.availability, FixAvailability.available);
+      expect(disable.title, 'Prefer IPv4');
       expect(disable.supportsPlatform(FixPlatform.macOS), isTrue);
     });
 

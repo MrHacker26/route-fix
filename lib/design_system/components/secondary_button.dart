@@ -47,7 +47,7 @@ class _SecondaryButtonState extends State<SecondaryButton> {
       onExit: enabled ? (_) => setState(() => _hovered = false) : null,
       child: AnimatedScale(
         scale: enabled && _hovered ? 1.012 : 1,
-        duration: const Duration(milliseconds: 140),
+        duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
         child: OutlinedButton(
           onPressed: widget.onPressed,
@@ -62,7 +62,7 @@ class _SecondaryButtonState extends State<SecondaryButton> {
               horizontal: AppSpacing.buttonPaddingH,
               vertical: AppSpacing.buttonPaddingV,
             ),
-            minimumSize: const Size(64, 44),
+            minimumSize: const Size(64, 36),
             side: BorderSide(
               color: enabled
                   ? (_hovered ? AppColors.outline : AppColors.outlineSubtle)

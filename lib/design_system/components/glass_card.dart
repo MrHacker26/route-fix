@@ -31,7 +31,7 @@ class _GlassCardState extends State<GlassCard> {
 
   @override
   Widget build(BuildContext context) {
-    final radius = widget.borderRadius ?? AppRadius.lgAll;
+    final radius = widget.borderRadius ?? AppRadius.mdAll;
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -39,7 +39,7 @@ class _GlassCardState extends State<GlassCard> {
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 160),
         curve: Curves.easeOutCubic,
-        transform: Matrix4.translationValues(0, _hovered ? -1.5 : 0, 0),
+        transform: Matrix4.translationValues(0, _hovered ? -1 : 0, 0),
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 160),
           curve: Curves.easeOutCubic,

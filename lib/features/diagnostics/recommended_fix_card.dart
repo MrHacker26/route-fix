@@ -1,9 +1,14 @@
 import 'package:flutter/material.dart';
 
 import '../../design_system/design_system.dart';
+import '../../di/app_services.dart';
+import '../../domain/autofix/auto_fix_service.dart';
 import '../../domain/autofix/fix_provider.dart';
 import '../../domain/autofix/models/fix_result.dart';
+import '../../domain/autofix/models/fix_type.dart';
+import '../../domain/autofix/platform_fix_executor.dart';
 import 'apply_fix_confirmation_dialog.dart';
+import 'auto_fix_success_dialog.dart';
 import 'diagnostics_result_view_data.dart';
 import 'human_message.dart';
 
@@ -15,13 +20,17 @@ class RecommendedFixCard extends StatefulWidget {
     super.key,
     required this.fix,
     required this.fixProvider,
+    this.autoFix,
     this.onRerunDiagnostics,
+    this.onApplied,
     this.compact = false,
   });
 
   final RecommendedFixView fix;
   final FixProvider fixProvider;
+  final AutoFixService? autoFix;
   final VoidCallback? onRerunDiagnostics;
+  final VoidCallback? onApplied;
   final bool compact;
 
   @override
@@ -32,9 +41,12 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
   _ApplyPhase _phase = _ApplyPhase.idle;
   String? _failureMessage;
   String? _failureTechnical;
+  String _progressLabel = AutoFixPhase.applying.label;
+
+  AutoFixService get _autoFix => widget.autoFix ?? AppServices.autoFix;
 
   Future<void> _handleApply() async {
-    if (_phase == _ApplyPhase.loading) return;
+    if (_phase == _ApplyPhase.loading || _autoFix.isBusy) return;
 
     final confirmed = await showApplyFixConfirmation(context, fix: widget.fix);
     if (confirmed != ApplyFixConfirmationResult.confirmed) return;
@@ -44,11 +56,18 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
       _phase = _ApplyPhase.loading;
       _failureMessage = null;
       _failureTechnical = null;
+      _progressLabel = AutoFixPhase.applying.label;
     });
 
     late final FixResult result;
     try {
-      result = await widget.fixProvider.apply(widget.fix.kind);
+      result = await _autoFix.apply(
+        widget.fix.kind.toFixType,
+        onPhase: (phase) {
+          if (!mounted) return;
+          setState(() => _progressLabel = phase.label);
+        },
+      );
     } on Object catch (error) {
       if (!mounted) return;
       setState(() {
@@ -64,19 +83,32 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
 
     if (!mounted) return;
 
-    setState(() {
-      if (result.success) {
+    if (result.success) {
+      setState(() {
         _phase = _ApplyPhase.success;
         _failureMessage = null;
         _failureTechnical = null;
-      } else {
-        _phase = _ApplyPhase.failure;
-        _failureTechnical = result.error ?? result.message;
-        _failureMessage = HumanMessage.fromProbeError(
-          result.error ?? result.message,
-          fallback: 'That change didn’t go through. You can try again.',
-        );
+      });
+      final next = await showAutoFixSuccessDialog(context);
+      if (!mounted) return;
+      widget.onApplied?.call();
+      if (next == AutoFixSuccessDialogResult.runDiagnosticsAgain) {
+        widget.onRerunDiagnostics?.call();
       }
+      return;
+    }
+
+    setState(() {
+      _phase = _ApplyPhase.failure;
+      _failureTechnical = [
+        if (result.error != null) result.error!,
+        if (result.metadata['stderr'] != null) result.metadata['stderr']!,
+        if (result.executedCommand != null) result.executedCommand!,
+      ].where((part) => part.trim().isNotEmpty).join('\n');
+      _failureMessage = HumanMessage.fromProbeError(
+        result.message ?? result.error,
+        fallback: 'That change didn’t go through. You can try again.',
+      );
     });
   }
 
@@ -89,6 +121,7 @@ class _RecommendedFixCardState extends State<RecommendedFixCard> {
       _ => _RecommendationBody(
           fix: widget.fix,
           loading: _phase == _ApplyPhase.loading,
+          progressLabel: _progressLabel,
           failureMessage: _failureMessage,
           failureTechnical: _failureTechnical,
           compact: widget.compact,
@@ -102,6 +135,7 @@ class _RecommendationBody extends StatelessWidget {
   const _RecommendationBody({
     required this.fix,
     required this.loading,
+    required this.progressLabel,
     required this.onApply,
     required this.compact,
     this.failureMessage,
@@ -110,6 +144,7 @@ class _RecommendationBody extends StatelessWidget {
 
   final RecommendedFixView fix;
   final bool loading;
+  final String progressLabel;
   final bool compact;
   final String? failureMessage;
   final String? failureTechnical;
@@ -120,78 +155,80 @@ class _RecommendationBody extends StatelessWidget {
     final text = AppTypography.textTheme;
 
     return GlassCard(
-      padding: EdgeInsets.all(compact ? AppSpacing.md : AppSpacing.cardPadding),
+      padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            compact ? 'Possible action' : 'Recommended action',
+            compact ? 'Possible action' : 'Recommended Fix',
             style: text.labelMedium?.copyWith(
               color: AppColors.onSurfaceMuted,
               letterSpacing: 0.2,
+              fontWeight: FontWeight.w600,
             ),
           ),
           const SizedBox(height: AppSpacing.xs),
-          Text(
-            fix.title,
-            style: compact ? text.titleMedium : text.titleLarge,
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  fix.title,
+                  style: (compact ? text.titleMedium : text.titleLarge)
+                      ?.copyWith(fontWeight: FontWeight.w600),
+                ),
+              ),
+              const SizedBox(width: AppSpacing.sm),
+              StatusBadge(
+                label: fix.availabilityLabel,
+                tone: fix.availabilityTone,
+                showDot: false,
+              ),
+            ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          _LabeledBlock(label: 'What we saw', value: fix.why),
-          if (!compact) ...[
-            const SizedBox(height: AppSpacing.md),
-            _LabeledBlock(
-              label: 'Why this recommendation?',
-              value: fix.whyThisRecommendation,
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            fix.description,
+            style: text.bodyMedium?.copyWith(
+              color: AppColors.onSurfaceVariant,
+              height: 1.45,
             ),
-            const SizedBox(height: AppSpacing.md),
+          ),
+          if (!compact) ...[
+            const SizedBox(height: AppSpacing.sm),
+            _LabeledBlock(label: 'What we saw', value: fix.why),
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              'Confidence · ${fix.confidenceLabel}',
+              style: text.labelSmall?.copyWith(
+                color: AppColors.onSurfaceMuted,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+          if (loading) ...[
+            const SizedBox(height: AppSpacing.lg),
             Row(
               children: [
-                Expanded(
-                  child: _LabeledBlock(
-                    label: 'Confidence',
-                    value: fix.confidenceLabel,
+                const SizedBox(
+                  width: AppSpacing.iconRow,
+                  height: AppSpacing.iconRow,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.primary,
                   ),
                 ),
-                const SizedBox(width: AppSpacing.md),
+                const SizedBox(width: AppSpacing.sm),
                 Expanded(
-                  child: _LabeledBlock(
-                    label: 'Estimated improvement',
-                    value: fix.estimatedImprovement,
+                  child: Text(
+                    progressLabel,
+                    style: text.bodyMedium?.copyWith(
+                      color: AppColors.onSurfaceVariant,
+                    ),
                   ),
                 ),
               ],
             ),
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              'Estimated impact',
-              style: text.labelMedium?.copyWith(
-                color: AppColors.onSurfaceMuted,
-              ),
-            ),
-            const SizedBox(height: AppSpacing.xs),
-            for (final impact in fix.serviceImpacts) ...[
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-                child: Row(
-                  children: [
-                    Icon(
-                      impact.icon,
-                      size: AppSpacing.iconInline,
-                      color: AppColors.onSurfaceVariant,
-                    ),
-                    const SizedBox(width: AppSpacing.xs),
-                    Expanded(child: Text(impact.name, style: text.bodySmall)),
-                    Text(
-                      impact.label,
-                      style: text.labelMedium?.copyWith(
-                        color: AppColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
           ],
           if (failureMessage != null) ...[
             const SizedBox(height: AppSpacing.md),
@@ -223,6 +260,8 @@ class _RecommendationBody extends StatelessWidget {
                         child: SelectableText(
                           failureTechnical!,
                           style: text.bodySmall?.copyWith(
+                            fontFamily: 'Menlo',
+                            fontFamilyFallback: const ['Consolas', 'monospace'],
                             color: AppColors.onSurfaceMuted,
                             height: 1.4,
                           ),
@@ -240,8 +279,8 @@ class _RecommendationBody extends StatelessWidget {
             width: double.infinity,
             child: PrimaryButton(
               label: loading
-                  ? 'Applying…'
-                  : (compact ? 'Apply' : 'Apply recommended fix'),
+                  ? progressLabel
+                  : (compact ? 'Apply Fix' : 'Apply Fix'),
               icon: loading ? null : Icons.auto_fix_high_outlined,
               expanded: true,
               onPressed: (!fix.canConfirmApply || loading) ? null : onApply,
@@ -275,14 +314,14 @@ class _SuccessBody extends StatelessWidget {
               ),
               const SizedBox(width: AppSpacing.xs),
               Text(
-                'Fix applied',
+                'Network Updated',
                 style: text.titleMedium?.copyWith(color: AppColors.success),
               ),
             ],
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Run diagnostics again to verify the improvement.',
+            'The recommended fix was successfully applied.',
             style: text.bodyMedium?.copyWith(
               color: AppColors.onSurfaceVariant,
               height: 1.45,
@@ -292,7 +331,7 @@ class _SuccessBody extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: PrimaryButton(
-              label: 'Run diagnostics again',
+              label: 'Run Again',
               icon: Icons.refresh_rounded,
               expanded: true,
               onPressed: onRerunDiagnostics,

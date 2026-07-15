@@ -6,6 +6,7 @@ export 'components/glass_card.dart';
 export 'components/primary_button.dart';
 export 'components/secondary_button.dart';
 export 'components/status_badge.dart';
+export 'tokens/app_assets.dart';
 export 'tokens/app_colors.dart';
 export 'tokens/app_radius.dart';
 export 'tokens/app_shadows.dart';

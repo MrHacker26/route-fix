@@ -1,19 +1,39 @@
+import 'dart:io';
+
 import '../../domain/autofix/models/fix_action.dart';
 import '../../domain/autofix/models/fix_result.dart';
+import '../../domain/autofix/models/fix_type.dart';
 import '../../domain/autofix/platform_fix_provider.dart';
+import '../../domain/autofix/shell_command_executor.dart';
+import 'executors/windows_platform_fix_executor.dart';
+import 'shell/dart_io_shell_command_executor.dart';
 import 'windows/windows_admin_requirement.dart';
 import 'windows/windows_ipv6_fix_commands.dart';
 
-/// Windows Auto Fix adapter.
-///
-/// Prepares PowerShell / `netsh` commands for IPv6 fixes through the
-/// [FixProvider] interface. Does **not** execute them automatically.
-final class WindowsFixProvider extends PlatformFixProvider {
-  const WindowsFixProvider({
-    this._commands = const WindowsIpv6FixCommands(),
-    this._adminResolver = const WindowsAdminRequirementResolver(),
-  });
+/// Runs a host process for Windows Auto Fix adapters.
+typedef WindowsFixProcessRunner = Future<ProcessResult> Function(
+  String executable,
+  List<String> arguments,
+);
 
+/// Windows Auto Fix adapter — executes PowerShell NetAdapterBinding via argv.
+final class WindowsFixProvider extends PlatformFixProvider {
+  WindowsFixProvider({
+    WindowsFixProcessRunner? runProcess,
+    ShellCommandExecutor? shell,
+    WindowsIpv6FixCommands commands = const WindowsIpv6FixCommands(),
+    WindowsAdminRequirementResolver adminResolver =
+        const WindowsAdminRequirementResolver(),
+  })  : _commands = commands,
+        _adminResolver = adminResolver,
+        _executor = WindowsPlatformFixExecutor(
+          shell: shell ??
+              DartIoShellCommandExecutor(
+                runProcess: runProcess,
+              ),
+        );
+
+  final WindowsPlatformFixExecutor _executor;
   final WindowsIpv6FixCommands _commands;
   final WindowsAdminRequirementResolver _adminResolver;
 
@@ -28,8 +48,13 @@ final class WindowsFixProvider extends PlatformFixProvider {
             action.kind == FixActionKind.enableIpv6)
           FixAction(
             kind: action.kind,
-            title: action.title,
-            description: action.description,
+            title: action.kind == FixActionKind.disableIpv6
+                ? FixType.preferIpv4.displayTitle
+                : FixType.restoreDefault.displayTitle,
+            description: action.kind == FixActionKind.disableIpv6
+                ? 'RouteFix detected an IPv6 routing issue. '
+                    'Temporarily preferring IPv4 may improve connectivity on this network.'
+                : 'Undo Auto Fix changes and restore default network settings.',
             availability: FixAvailability.requiresElevation,
             supportedPlatforms: action.supportedPlatforms,
             relatedIssueCodes: action.relatedIssueCodes,
@@ -41,58 +66,30 @@ final class WindowsFixProvider extends PlatformFixProvider {
 
   @override
   Future<FixResult> applyStub(FixActionKind kind) async {
-    return switch (kind) {
-      FixActionKind.disableIpv6 => _planIpv6(enabled: false),
-      FixActionKind.enableIpv6 => _planIpv6(enabled: true),
-      FixActionKind.flushDns || FixActionKind.openWarp =>
-        FixResult.notImplemented(kind),
-    };
-  }
-
-  Future<FixResult> _planIpv6({required bool enabled}) async {
-    final kind =
-        enabled ? FixActionKind.enableIpv6 : FixActionKind.disableIpv6;
-    final admin = await _adminResolver.forAction(kind);
-    final command = _commands.primaryCommand(enable: enabled);
-    final netsh =
-        enabled ? _commands.enableIpv6Netsh() : _commands.disableIpv6Netsh();
-
-    if (!admin.required) {
-      return FixResult.planned(
-        kind,
-        success: false,
-        message: 'Failed to prepare Windows IPv6 fix.',
-        error: 'Administrator requirement could not be determined.',
-        executedCommand: command,
-        platform: FixPlatform.windows,
-        requiresElevation: false,
-      );
-    }
-
-    final verb = enabled ? 'enable' : 'disable';
-    final elevationNote = admin.isElevated == null
-        ? 'Administrator privileges are required to apply this fix.'
-        : (admin.isElevated!
-            ? 'Current process is elevated; command is ready to apply.'
-            : 'Current process is not elevated; elevate before applying.');
-
-    return FixResult.planned(
+    // Still expose planned command metadata for debugging, then execute.
+    final planned = await _planMetadata(kind);
+    final result = await _executor.apply(kind.toFixType);
+    if (!result.success) return result;
+    return FixResult.success(
       kind,
-      message:
-          'Prepared Windows command to $verb IPv6 via PowerShell NetAdapterBinding. '
-          '$elevationNote Command was not executed.',
-      executedCommand: command,
-      platform: FixPlatform.windows,
-      requiresElevation: admin.needsElevationToApply,
+      message: result.message ?? 'Network updated.',
+      executedCommand: result.executedCommand ?? planned,
+      platform: platform,
+      requiresElevation: true,
       metadata: {
-        'powershell': command,
-        'netsh': netsh,
-        'componentId': 'ms_tcpip6',
-        'adminRequired': '${admin.required}',
-        if (admin.isElevated != null) 'isElevated': '${admin.isElevated}',
-        if (admin.reason != null) 'adminReason': admin.reason!,
-        'execution': 'deferred',
+        ...result.metadata,
+        if (planned != null) 'plannedCommand': planned,
       },
     );
+  }
+
+  Future<String?> _planMetadata(FixActionKind kind) async {
+    if (kind != FixActionKind.disableIpv6 && kind != FixActionKind.enableIpv6) {
+      return null;
+    }
+    final enabled = kind == FixActionKind.enableIpv6;
+    final admin = await _adminResolver.forAction(kind);
+    final command = _commands.primaryCommand(enable: enabled);
+    return '$command (elevation=${admin.needsElevationToApply})';
   }
 }
