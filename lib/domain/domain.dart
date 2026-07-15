@@ -17,6 +17,7 @@ export 'repositories/connection_repository.dart';
 export 'repositories/diagnostics_repository.dart';
 export 'repositories/scan_history_repository.dart';
 export 'repositories/settings_repository.dart';
+export 'services/cloudflare_diagnostics_service.dart';
 export 'services/connectivity_service.dart';
 export 'services/dns_lookup_service.dart';
 export 'services/dns_probe_service.dart';
