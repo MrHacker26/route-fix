@@ -100,10 +100,10 @@ abstract final class AppTypography {
           letterSpacing: 0,
         ),
         labelSmall: _base.copyWith(
-          fontSize: 11,
+          fontSize: 12,
           fontWeight: FontWeight.w500,
-          letterSpacing: 0.1,
-          color: AppColors.onSurfaceMuted,
+          letterSpacing: 0.05,
+          color: AppColors.onSurfaceVariant,
         ),
       );
 }

@@ -63,7 +63,7 @@ class _OnboardingPageState extends State<OnboardingPage> {
             end: Alignment.bottomRight,
             colors: [
               AppColors.background,
-              Color(0xFF101018),
+              AppColors.atmosphere,
               AppColors.background,
             ],
             stops: [0.0, 0.45, 1.0],
@@ -165,7 +165,7 @@ class _OnboardingStepView extends StatelessWidget {
                     child: Icon(
                       step.icon,
                       color: AppColors.primary,
-                      size: 24,
+                      size: AppSpacing.iconLead,
                     ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
@@ -201,8 +201,8 @@ class _OnboardingStepView extends StatelessWidget {
             alignment: WrapAlignment.center,
             children: [
               StatusBadge(label: 'DNS', tone: StatusBadgeTone.neutral),
-              StatusBadge(label: 'Latency', tone: StatusBadgeTone.neutral),
-              StatusBadge(label: 'Hops', tone: StatusBadgeTone.neutral),
+              StatusBadge(label: 'Routes', tone: StatusBadgeTone.neutral),
+              StatusBadge(label: 'Timing', tone: StatusBadgeTone.neutral),
               StatusBadge(label: 'APIs', tone: StatusBadgeTone.neutral),
             ],
           ),
@@ -228,9 +228,9 @@ class _OnboardingDots extends StatelessWidget {
       children: List.generate(count, (i) {
         final active = i == index;
         return AnimatedContainer(
-          duration: const Duration(milliseconds: 280),
+          duration: const Duration(milliseconds: 200),
           curve: Curves.easeOutCubic,
-          margin: const EdgeInsets.symmetric(horizontal: 4),
+          margin: const EdgeInsets.symmetric(horizontal: AppSpacing.xxs),
           width: active ? 20 : 6,
           height: 6,
           decoration: BoxDecoration(

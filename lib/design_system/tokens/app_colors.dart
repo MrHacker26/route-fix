@@ -36,7 +36,10 @@ abstract final class AppColors {
   // Text
   static const Color onSurface = Color(0xFFF4F4F5);
   static const Color onSurfaceVariant = Color(0xFFA1A1AA);
-  static const Color onSurfaceMuted = Color(0xFF71717A);
+  static const Color onSurfaceMuted = Color(0xFF8B8B96);
+
+  /// Soft atmosphere accent used in page background gradients.
+  static const Color atmosphere = Color(0xFF101018);
 
   // Semantic
   static const Color success = Color(0xFF4ADE80);

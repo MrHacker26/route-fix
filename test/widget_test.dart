@@ -48,14 +48,14 @@ void main() {
     expect(find.text('Quick summary'), findsOneWidget);
 
     await tester.scrollUntilVisible(
-      find.text('Start Diagnosis'),
+      find.text('Start diagnostics'),
       200,
       scrollable: find.byType(Scrollable).first,
     );
     await tester.pumpAndSettle();
 
     expect(find.text('Recent scan'), findsOneWidget);
-    expect(find.text('Start Diagnosis'), findsOneWidget);
+    expect(find.text('Start diagnostics'), findsOneWidget);
   });
 
   testWidgets('Dashboard shows retry when coordinator fails', (
@@ -72,7 +72,7 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Unable to load health report'), findsOneWidget);
-    expect(find.text('Retry'), findsOneWidget);
+    expect(find.text('Try again'), findsOneWidget);
   });
 
   testWidgets('Diagnostics screen shows live fake targets', (WidgetTester tester) async {
@@ -85,14 +85,15 @@ void main() {
     expect(find.text('DNS'), findsOneWidget);
     expect(find.text('IPv4'), findsOneWidget);
     expect(find.text('IPv6'), findsOneWidget);
-    expect(find.text('GitHub'), findsOneWidget);
+    expect(find.text('TLS'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('PyPI'),
       120,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Cloudflare'), findsOneWidget);
+    expect(find.text('HTTPS'), findsOneWidget);
+    expect(find.text('GitHub'), findsOneWidget);
     expect(find.text('PyPI'), findsOneWidget);
 
     await tester.pump(const Duration(milliseconds: 800));
@@ -144,9 +145,9 @@ void main() {
     await tester.pump(const Duration(milliseconds: 1100));
 
     expect(find.text('Results'), findsOneWidget);
-    expect(find.text('Health'), findsOneWidget);
-    expect(find.text('Ready'), findsOneWidget);
-    expect(find.text('Network snapshot'), findsOneWidget);
+    expect(find.text('Health'), findsWidgets);
+    expect(find.text('Healthy'), findsOneWidget);
+    expect(find.text('Network path'), findsOneWidget);
 
     await tester.scrollUntilVisible(
       find.text('Problem'),
@@ -155,7 +156,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('GitHub is hard to reach'), findsOneWidget);
+    expect(find.text('GitHub took longer than expected'), findsOneWidget);
     expect(find.text('Impact'), findsOneWidget);
 
     await tester.scrollUntilVisible(
@@ -193,14 +194,14 @@ void main() {
       200,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('Nothing standing out'), findsOneWidget);
+    expect(find.text('Everything looks healthy'), findsWidgets);
 
     await tester.scrollUntilVisible(
       find.text('Recommendation'),
       120,
       scrollable: find.byType(Scrollable).first,
     );
-    expect(find.text('No change needed right now'), findsOneWidget);
+    expect(find.text('No recommendation available.'), findsOneWidget);
   });
 
   testWidgets('Results screen shows retry when load fails', (WidgetTester tester) async {

@@ -36,7 +36,7 @@ abstract final class OnboardingSteps {
       eyebrow: 'Diagnosis',
       title: 'Find the real bottleneck',
       body:
-          'Trace DNS, hops, and latency to the hosts you care about so fixes stay precise — and calm.',
+          'Trace DNS, routes, and connection timing to the hosts you care about — so fixes stay precise.',
       icon: Icons.timeline_outlined,
     ),
   ];

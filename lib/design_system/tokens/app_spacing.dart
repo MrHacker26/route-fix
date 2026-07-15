@@ -14,4 +14,22 @@ abstract final class AppSpacing {
   static const double cardPadding = 20;
   static const double badgePaddingH = 10;
   static const double badgePaddingV = 4;
+
+  /// Compact inline icons (list accents, impact chips).
+  static const double iconInline = 18;
+
+  /// Standard row / nav icons.
+  static const double iconRow = 20;
+
+  /// Leading glyph icons.
+  static const double iconLead = 22;
+
+  /// Shared health progress bar height.
+  static const double healthBar = 6;
+
+  /// Shared health ring diameter.
+  static const double healthRing = 120;
+
+  /// Shared health ring stroke.
+  static const double healthRingStroke = 8;
 }

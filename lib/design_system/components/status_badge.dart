@@ -30,37 +30,40 @@ class StatusBadge extends StatelessWidget {
   Widget build(BuildContext context) {
     final colors = _colorsFor(tone);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpacing.badgePaddingH,
-        vertical: AppSpacing.badgePaddingV,
-      ),
-      decoration: BoxDecoration(
-        color: colors.container,
-        borderRadius: AppRadius.pill,
-        border: Border.all(color: colors.foreground.withValues(alpha: 0.25)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showDot) ...[
-            Container(
-              width: 6,
-              height: 6,
-              decoration: BoxDecoration(
+    return Semantics(
+      label: label,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpacing.badgePaddingH,
+          vertical: AppSpacing.badgePaddingV,
+        ),
+        decoration: BoxDecoration(
+          color: colors.container,
+          borderRadius: AppRadius.pill,
+          border: Border.all(color: colors.foreground.withValues(alpha: 0.25)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (showDot) ...[
+              Container(
+                width: 6,
+                height: 6,
+                decoration: BoxDecoration(
+                  color: colors.foreground,
+                  shape: BoxShape.circle,
+                ),
+              ),
+              const SizedBox(width: AppSpacing.xxs),
+            ],
+            Text(
+              label,
+              style: AppTypography.textTheme.labelMedium?.copyWith(
                 color: colors.foreground,
-                shape: BoxShape.circle,
               ),
             ),
-            const SizedBox(width: AppSpacing.xxs + 2),
           ],
-          Text(
-            label,
-            style: AppTypography.textTheme.labelMedium?.copyWith(
-              color: colors.foreground,
-            ),
-          ),
-        ],
+        ),
       ),
     );
   }

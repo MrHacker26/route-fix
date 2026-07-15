@@ -88,8 +88,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Fix applied'), findsOneWidget);
-    expect(find.text('Re-run diagnostics'), findsOneWidget);
-    await tester.tap(find.text('Re-run diagnostics'));
+    expect(find.text('Run diagnostics again'), findsOneWidget);
+    await tester.tap(find.text('Run diagnostics again'));
     await tester.pump();
     expect(rerun, isTrue);
   });

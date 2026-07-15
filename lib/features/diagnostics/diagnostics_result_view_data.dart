@@ -51,10 +51,10 @@ final class DiagnosticsResultViewData {
     final scoreTone = _toneForScore(report.health.score);
 
     final summary = report.issues.isEmpty
-        ? 'Your routes look calm for this check. Everyday tools should feel responsive.'
+        ? 'Everything looks healthy.'
         : report.issues.length == 1
-            ? 'We found one route issue that may slow some developer tools.'
-            : 'We found ${report.issues.length} route issues that may slow some developer tools.';
+            ? 'One path may feel slower than usual.'
+            : 'A few paths may feel slower than usual.';
 
     final created = report.createdAt.toLocal();
     final timestamp =
@@ -67,7 +67,7 @@ final class DiagnosticsResultViewData {
             title: _friendlyIssueTitle(issue),
             detail: HumanMessage.fromProbeError(
               issue.description,
-              fallback: 'Something on this network path isn’t responding well.',
+              fallback: 'We couldn’t fully verify this path.',
             ),
             severity: HumanMessage.severityLabel(issue.severity.name),
             tone: _toneForSeverity(issue.severity),
@@ -83,8 +83,8 @@ final class DiagnosticsResultViewData {
 
     return DiagnosticsResultViewData(
       overallScore: report.health.score,
-      scoreLabel: _friendlyScoreLabel(report.health.label, report.health.score),
-      scoreSummary: report.health.summary ?? summary,
+      scoreLabel: HumanMessage.scoreBadge(report.health.score),
+      scoreSummary: _friendlyHealthSummary(report.health.summary, summary),
       scoreTone: scoreTone,
       confidence: report.confidence,
       timestampLabel: timestamp,
@@ -95,6 +95,20 @@ final class DiagnosticsResultViewData {
       primaryFix: fixes.primary,
       secondaryFixes: fixes.secondary,
     );
+  }
+
+  static String _friendlyHealthSummary(String? domainSummary, String fallback) {
+    final raw = domainSummary?.trim() ?? '';
+    if (raw.isEmpty) return fallback;
+    final lower = raw.toLowerCase();
+    if (lower.contains('all diagnosis rules passed') ||
+        lower.contains('rules passed')) {
+      return 'Everything looks healthy.';
+    }
+    if (RegExp(r'^\d+\s+issues?\s+detected').hasMatch(lower)) {
+      return fallback;
+    }
+    return raw;
   }
 
   /// One primary actionable fix + optional secondary actions.
@@ -226,7 +240,7 @@ final class DiagnosticsResultViewData {
         final formatted = ratio >= 2
             ? ratio.round().toString()
             : ratio.toStringAsFixed(1);
-        return 'IPv6 TCP connect is about $formatted× slower than IPv4 right now.';
+        return 'IPv6 is about $formatted× slower than IPv4 right now.';
       }
     }
 
@@ -246,13 +260,13 @@ final class DiagnosticsResultViewData {
   }) {
     return switch (action.kind) {
       FixActionKind.disableIpv6 =>
-        'Preferring IPv4 can help apps skip a slow IPv6 TCP path and feel snappier for tools that use the network.',
+        'Prefer IPv4 when the IPv6 path is clearly slower or unavailable.',
       FixActionKind.enableIpv6 =>
-        'Turning IPv6 back on can restore normal dual-stack routing when something disabled it earlier.',
+        'Restore IPv6 if it was switched off earlier.',
       FixActionKind.flushDns =>
-        'Clearing outdated DNS answers can help when names resolve incorrectly after network changes.',
+        'Clear outdated DNS answers after network changes.',
       FixActionKind.openWarp =>
-        'A quieter edge path can help when public routes are congested or unreliable.',
+        'Try a quieter edge path when public routes feel congested.',
     };
   }
 
@@ -269,7 +283,7 @@ final class DiagnosticsResultViewData {
       );
       if (parsed != null && parsed > confidence) confidence = parsed;
     }
-    return '${(confidence * 100).round()}%';
+    return HumanMessage.confidenceStrength(confidence);
   }
 
   static String _estimatedImprovement({
@@ -333,7 +347,7 @@ final class DiagnosticsResultViewData {
         ServiceImpactView(
           name: entry.key,
           level: entry.value,
-          label: HumanMessage.impactLabel(entry.value),
+          label: HumanMessage.fixImpactLabel(entry.value),
           icon: _iconForService(entry.key),
         ),
     ];
@@ -376,25 +390,25 @@ final class DiagnosticsResultViewData {
       ServiceImpactView(
         name: 'Git',
         level: git,
-        label: HumanMessage.impactLabel(git),
+        label: HumanMessage.feltImpactLabel(git),
         icon: _iconForService('Git'),
       ),
       ServiceImpactView(
         name: 'Python',
         level: python,
-        label: HumanMessage.impactLabel(python),
+        label: HumanMessage.feltImpactLabel(python),
         icon: _iconForService('Python'),
       ),
       ServiceImpactView(
         name: 'Docker',
         level: docker,
-        label: HumanMessage.impactLabel(docker),
+        label: HumanMessage.feltImpactLabel(docker),
         icon: _iconForService('Docker'),
       ),
       ServiceImpactView(
         name: 'AI APIs',
         level: ai,
-        label: HumanMessage.impactLabel(ai),
+        label: HumanMessage.feltImpactLabel(ai),
         icon: _iconForService('AI APIs'),
       ),
     ];
@@ -403,127 +417,135 @@ final class DiagnosticsResultViewData {
   static List<NetworkMetricView> _networkMetricsFrom(Map<String, String> meta) {
     final metrics = <NetworkMetricView>[];
 
+    // DNS
+    final dnsOk = meta['dns_success'] != 'false';
     final dnsMs = meta['dns_lookup_ms'];
-    if (dnsMs != null || meta.containsKey('dns_success')) {
-      final dnsOk = meta['dns_success'] != 'false';
-      metrics.add(
-        NetworkMetricView(
-          title: 'DNS lookup',
-          value: dnsOk
-              ? (dnsMs != null ? '$dnsMs ms' : 'Resolved')
-              : 'Failed',
-          detail: dnsOk
-              ? 'Name resolution time'
-              : HumanMessage.fromProbeError(
-                  meta['dns_error'],
-                  fallback: 'Couldn’t resolve the hostname',
-                ),
-          tone: dnsOk ? StatusBadgeTone.success : StatusBadgeTone.error,
-          icon: Icons.dns_outlined,
-          technicalDetail: [
-            if (dnsMs != null) 'dns_lookup_ms=$dnsMs',
-            if (meta['dns_error'] != null) meta['dns_error']!,
-          ].join('\n'),
-        ),
-      );
-    }
+    metrics.add(
+      NetworkMetricView(
+        title: 'DNS',
+        value: dnsOk
+            ? (dnsMs != null ? '$dnsMs ms' : 'Resolved')
+            : 'Unavailable',
+        detail: dnsOk
+            ? 'Resolved'
+            : HumanMessage.fromProbeError(
+                meta['dns_error'],
+                fallback: 'We couldn’t verify DNS.',
+              ),
+        tone: dnsOk ? StatusBadgeTone.success : StatusBadgeTone.error,
+        icon: Icons.dns_outlined,
+        technicalDetail: [
+          if (dnsMs != null) 'DNS lookup: $dnsMs ms',
+          if (meta['dns_error'] != null) meta['dns_error']!,
+        ].join('\n'),
+      ),
+    );
 
+    // IPv4
     final ipv4Ok = meta['ipv4_success'] == 'true';
     final ipv4TcpMs = meta['ipv4_tcp_ms'] ?? meta['ipv4_latency_ms'];
     final ipv4DnsMs = meta['ipv4_dns_ms'];
     metrics.add(
       NetworkMetricView(
-        title: 'IPv4 connect',
+        title: 'IPv4',
         value: ipv4Ok
-            ? (ipv4TcpMs != null ? '$ipv4TcpMs ms' : 'Reachable')
+            ? (ipv4TcpMs != null ? '$ipv4TcpMs ms' : 'Connected')
             : 'Unavailable',
         detail: ipv4Ok
-            ? 'TCP connect time'
+            ? 'Connected'
             : HumanMessage.fromProbeError(
                 meta['ipv4_error'],
-                fallback: 'Couldn’t complete an IPv4 check',
+                fallback: 'We couldn’t verify IPv4.',
               ),
         tone: ipv4Ok ? StatusBadgeTone.success : StatusBadgeTone.error,
-        icon: Icons.public_rounded,
+        icon: Icons.filter_1_rounded,
         technicalDetail: [
           if (ipv4DnsMs != null) 'DNS: $ipv4DnsMs ms',
           if (ipv4TcpMs != null) 'TCP: $ipv4TcpMs ms',
-          if (meta['ipv4_address'] != null) 'Address: ${meta['ipv4_address']}',
+          if (meta['ipv4_address'] != null) 'IP: ${meta['ipv4_address']}',
           if (meta['ipv4_error'] != null) meta['ipv4_error']!,
         ].join('\n'),
       ),
     );
 
+    // IPv6 — never invent success; no native AAAA → explicit unavailable.
     final ipv6Ok = meta['ipv6_success'] == 'true';
     final ipv6TcpMs = meta['ipv6_tcp_ms'] ?? meta['ipv6_latency_ms'];
     final ipv6DnsMs = meta['ipv6_dns_ms'];
-    if (meta.containsKey('ipv6_success') || ipv6TcpMs != null) {
-      metrics.add(
-        NetworkMetricView(
-          title: 'IPv6 connect',
-          value: ipv6Ok
-              ? (ipv6TcpMs != null ? '$ipv6TcpMs ms' : 'Reachable')
-              : 'Unavailable',
-          detail: ipv6Ok
-              ? 'TCP connect time'
-              : HumanMessage.fromProbeError(
-                  meta['ipv6_error'],
-                  fallback: 'Couldn’t complete an IPv6 check',
-                ),
-          tone: ipv6Ok
-              ? (ipv6TcpMs != null &&
-                      ipv4TcpMs != null &&
-                      (double.tryParse(ipv6TcpMs) ?? 0) >
-                          (double.tryParse(ipv4TcpMs) ?? 0) * 2
-                  ? StatusBadgeTone.warning
-                  : StatusBadgeTone.success)
-              : StatusBadgeTone.warning,
-          icon: Icons.hub_outlined,
-          technicalDetail: [
-            if (ipv6DnsMs != null) 'DNS: $ipv6DnsMs ms',
-            if (ipv6TcpMs != null) 'TCP: $ipv6TcpMs ms',
-            if (meta['ipv6_address'] != null)
-              'Address: ${meta['ipv6_address']}',
-            if (meta['ipv6_error'] != null) meta['ipv6_error']!,
-          ].join('\n'),
-        ),
-      );
-    }
+    final ipv6Error = meta['ipv6_error'] ?? '';
+    final noNativeIpv6 = !ipv6Ok &&
+        (ipv6Error.toLowerCase().contains('no ipv6 address advertised') ||
+            ipv6Error.toLowerCase().contains('no ipv6 route advertised') ||
+            ipv6TcpMs == null);
+    metrics.add(
+      NetworkMetricView(
+        title: 'IPv6',
+        value: ipv6Ok
+            ? (ipv6TcpMs != null ? '$ipv6TcpMs ms' : 'Connected')
+            : 'Unavailable',
+        detail: ipv6Ok
+            ? 'Connected'
+            : (noNativeIpv6
+                ? 'No IPv6 route advertised.'
+                : HumanMessage.fromProbeError(
+                    meta['ipv6_error'],
+                    fallback: 'We couldn’t verify IPv6.',
+                  )),
+        tone: ipv6Ok
+            ? (ipv6TcpMs != null &&
+                    ipv4TcpMs != null &&
+                    (double.tryParse(ipv6TcpMs) ?? 0) >
+                        (double.tryParse(ipv4TcpMs) ?? 0) * 2
+                ? StatusBadgeTone.warning
+                : StatusBadgeTone.success)
+            : StatusBadgeTone.neutral,
+        icon: Icons.filter_6_rounded,
+        technicalDetail: [
+          if (ipv6DnsMs != null) 'DNS: $ipv6DnsMs ms',
+          if (ipv6TcpMs != null) 'TCP: $ipv6TcpMs ms',
+          if (meta['ipv6_address'] != null) 'IP: ${meta['ipv6_address']}',
+          if (meta['ipv6_error'] != null) meta['ipv6_error']!,
+        ].join('\n'),
+      ),
+    );
 
+    // HTTPS
     final cfOk = meta['cloudflare_success'] != 'false';
-    if (meta.containsKey('cloudflare_success') ||
-        meta.containsKey('cloudflare_http_ms') ||
-        meta.containsKey('cloudflare_latency_ms')) {
-      final cfHttpMs = meta['cloudflare_http_ms'] ?? meta['cloudflare_latency_ms'];
-      metrics.add(
-        NetworkMetricView(
-          title: 'HTTPS response',
-          value: cfOk
-              ? (cfHttpMs != null ? '$cfHttpMs ms' : 'Reachable')
-              : 'Unavailable',
-          detail: cfOk
-              ? 'HTTP status-line time (after DNS / TCP / TLS)'
-              : HumanMessage.fromProbeError(
-                  meta['cloudflare_error'],
-                  fallback: 'Edge check didn’t complete',
-                ),
-          tone: cfOk ? StatusBadgeTone.success : StatusBadgeTone.warning,
-          icon: Icons.cloud_outlined,
-          technicalDetail: [
-            if (meta['cloudflare_dns_ms'] != null)
-              'DNS: ${meta['cloudflare_dns_ms']} ms',
-            if (meta['cloudflare_tcp_ms'] != null)
-              'TCP: ${meta['cloudflare_tcp_ms']} ms',
-            if (meta['cloudflare_tls_ms'] != null)
-              'TLS: ${meta['cloudflare_tls_ms']} ms',
-            if (cfHttpMs != null) 'HTTP: $cfHttpMs ms',
-            if (meta['cloudflare_http_status'] != null)
-              'HTTP ${meta['cloudflare_http_status']}',
-            if (meta['cloudflare_error'] != null) meta['cloudflare_error']!,
-          ].join('\n'),
-        ),
-      );
-    }
+    final cfHttpMs = meta['cloudflare_http_ms'] ?? meta['cloudflare_latency_ms'];
+    final cfStatus = meta['cloudflare_http_status'];
+    final cfStatusCode = int.tryParse(cfStatus ?? '');
+    final httpsValue = !cfOk
+        ? 'Unavailable'
+        : (cfStatusCode != null
+            ? (cfStatusCode >= 200 && cfStatusCode < 400
+                ? '$cfStatusCode OK'
+                : '$cfStatusCode')
+            : (cfHttpMs != null ? '$cfHttpMs ms' : 'Verified'));
+    metrics.add(
+      NetworkMetricView(
+        title: 'HTTPS',
+        value: httpsValue,
+        detail: cfOk
+            ? 'Verified'
+            : HumanMessage.fromProbeError(
+                meta['cloudflare_error'],
+                fallback: 'We couldn’t verify HTTPS.',
+              ),
+        tone: cfOk ? StatusBadgeTone.success : StatusBadgeTone.warning,
+        icon: Icons.lock_outline_rounded,
+        technicalDetail: [
+          if (meta['cloudflare_dns_ms'] != null)
+            'DNS: ${meta['cloudflare_dns_ms']} ms',
+          if (meta['cloudflare_tcp_ms'] != null)
+            'TCP: ${meta['cloudflare_tcp_ms']} ms',
+          if (meta['cloudflare_tls_ms'] != null)
+            'TLS: ${meta['cloudflare_tls_ms']} ms',
+          if (cfHttpMs != null) 'HTTP: $cfHttpMs ms',
+          if (cfStatus != null) 'Status: $cfStatus',
+          if (meta['cloudflare_error'] != null) meta['cloudflare_error']!,
+        ].join('\n'),
+      ),
+    );
 
     return metrics;
   }
@@ -534,38 +556,85 @@ final class DiagnosticsResultViewData {
   ) {
     final rows = <TechnicalDetailView>[
       TechnicalDetailView(
-        label: 'Report ID',
+        label: 'Run',
         value: report.id,
       ),
       TechnicalDetailView(
-        label: 'Checked at',
-        value: report.createdAt.toUtc().toIso8601String(),
+        label: 'Time',
+        value: report.createdAt.toLocal().toString(),
       ),
       if (report.duration != null)
         TechnicalDetailView(
-          label: 'Duration',
+          label: 'Scan duration',
           value: '${report.duration!.inMilliseconds} ms',
         ),
-      for (final issue in report.issues)
+      const TechnicalDetailView(label: '— DNS —', value: ''),
+      if (meta['dns_lookup_ms'] != null)
+        TechnicalDetailView(label: 'DNS lookup', value: '${meta['dns_lookup_ms']} ms'),
+      if (meta['dns_success'] != null)
+        TechnicalDetailView(label: 'DNS status', value: meta['dns_success']!),
+      if (meta['dns_error'] != null)
+        TechnicalDetailView(label: 'DNS failure', value: meta['dns_error']!),
+      const TechnicalDetailView(label: '— TCP —', value: ''),
+      if (meta['ipv4_tcp_ms'] != null || meta['ipv4_latency_ms'] != null)
         TechnicalDetailView(
-          label: 'Rule ${issue.code ?? issue.id}',
-          value: [
-            issue.title,
-            issue.description,
-            if (issue.metadata['rule_confidence'] != null)
-              'confidence=${issue.metadata['rule_confidence']}'
-            else if (issue.metadata['confidence_confidence'] != null)
-              'confidence=${issue.metadata['confidence_confidence']}',
-          ].join(' · '),
+          label: 'IPv4 TCP',
+          value: '${meta['ipv4_tcp_ms'] ?? meta['ipv4_latency_ms']} ms',
         ),
-      for (final entry in meta.entries)
-        if (entry.key.contains('error') ||
-            entry.key.contains('latency') ||
-            entry.key.endsWith('_ms') ||
-            entry.key.contains('address') ||
-            entry.key.contains('status') ||
-            entry.key.startsWith('rules_'))
-          TechnicalDetailView(label: entry.key, value: entry.value),
+      if (meta['ipv4_address'] != null)
+        TechnicalDetailView(label: 'IPv4 address', value: meta['ipv4_address']!),
+      if (meta['ipv4_error'] != null)
+        TechnicalDetailView(label: 'IPv4 failure', value: meta['ipv4_error']!),
+      if (meta['ipv6_tcp_ms'] != null || meta['ipv6_latency_ms'] != null)
+        TechnicalDetailView(
+          label: 'IPv6 TCP',
+          value: '${meta['ipv6_tcp_ms'] ?? meta['ipv6_latency_ms']} ms',
+        ),
+      if (meta['ipv6_address'] != null)
+        TechnicalDetailView(label: 'IPv6 address', value: meta['ipv6_address']!),
+      if (meta['ipv6_error'] != null)
+        TechnicalDetailView(label: 'IPv6 failure', value: meta['ipv6_error']!),
+      const TechnicalDetailView(label: '— TLS / HTTP —', value: ''),
+      if (meta['cloudflare_tls_ms'] != null)
+        TechnicalDetailView(
+          label: 'TLS handshake',
+          value: '${meta['cloudflare_tls_ms']} ms',
+        ),
+      if (meta['cloudflare_http_ms'] != null ||
+          meta['cloudflare_latency_ms'] != null)
+        TechnicalDetailView(
+          label: 'HTTP response',
+          value:
+              '${meta['cloudflare_http_ms'] ?? meta['cloudflare_latency_ms']} ms',
+        ),
+      if (meta['cloudflare_http_status'] != null)
+        TechnicalDetailView(
+          label: 'HTTP status',
+          value: meta['cloudflare_http_status']!,
+        ),
+      if (meta['github_http_status'] != null)
+        TechnicalDetailView(
+          label: 'GitHub status',
+          value: meta['github_http_status']!,
+        ),
+      if (meta['cloudflare_error'] != null)
+        TechnicalDetailView(
+          label: 'HTTPS failure',
+          value: meta['cloudflare_error']!,
+        ),
+      if (report.issues.isNotEmpty) ...[
+        const TechnicalDetailView(label: '— Rules —', value: ''),
+        for (final issue in report.issues)
+          TechnicalDetailView(
+            label: issue.code ?? issue.id,
+            value: [
+              issue.title,
+              issue.description,
+              if (issue.metadata['rule_confidence'] != null)
+                'evidence=${HumanMessage.confidenceStrength(double.tryParse(issue.metadata['rule_confidence']!) ?? 0)}',
+            ].join(' · '),
+          ),
+      ],
     ];
     return rows;
   }
@@ -587,19 +656,16 @@ final class DiagnosticsResultViewData {
 
   static String _friendlyIssueTitle(DiagnosticIssue issue) {
     final code = issue.code ?? issue.id;
-    if (code.contains('ipv6_latency')) return 'IPv6 is slower than expected';
-    if (code.contains('ipv6_unavailable')) return 'IPv6 isn’t available';
-    if (code.contains('dns')) return 'Name lookup is having trouble';
-    if (code.contains('github')) return 'GitHub is hard to reach';
+    if (code.contains('ipv6_latency')) {
+      return 'IPv6 is slower than expected';
+    }
+    if (code.contains('ipv6_unavailable')) {
+      return 'We couldn’t verify IPv6';
+    }
+    if (code.contains('dns')) return 'Name lookup needs a look';
+    if (code.contains('github')) return 'GitHub took longer than expected';
     if (code.contains('pypi')) return 'Python packages may download slowly';
     return issue.title;
-  }
-
-  static String _friendlyScoreLabel(String label, int score) {
-    if (score >= 85) return 'Looking good';
-    if (score >= 70) return 'Mostly fine';
-    if (score >= 55) return 'Needs attention';
-    return 'Needs help';
   }
 
   static String _availabilityLabel(FixAvailability availability) {
@@ -643,6 +709,13 @@ final class DiagnosticsResultViewData {
     if (score >= 75) return StatusBadgeTone.success;
     if (score >= 55) return StatusBadgeTone.warning;
     return StatusBadgeTone.error;
+  }
+
+  /// Evidence strength tone — independent of health score coloring.
+  static StatusBadgeTone toneForConfidence(double confidence) {
+    if (confidence >= 0.85) return StatusBadgeTone.success;
+    if (confidence >= 0.6) return StatusBadgeTone.info;
+    return StatusBadgeTone.warning;
   }
 
   static StatusBadgeTone _toneForSeverity(DiagnosticSeverity severity) {

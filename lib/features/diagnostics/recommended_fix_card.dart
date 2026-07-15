@@ -137,7 +137,7 @@ class _RecommendationBody extends StatelessWidget {
             style: compact ? text.titleMedium : text.titleLarge,
           ),
           const SizedBox(height: AppSpacing.md),
-          _LabeledBlock(label: 'Why?', value: fix.why),
+          _LabeledBlock(label: 'What we saw', value: fix.why),
           if (!compact) ...[
             const SizedBox(height: AppSpacing.md),
             _LabeledBlock(
@@ -177,7 +177,7 @@ class _RecommendationBody extends StatelessWidget {
                   children: [
                     Icon(
                       impact.icon,
-                      size: 16,
+                      size: AppSpacing.iconInline,
                       color: AppColors.onSurfaceVariant,
                     ),
                     const SizedBox(width: AppSpacing.xs),
@@ -271,7 +271,7 @@ class _SuccessBody extends StatelessWidget {
               const Icon(
                 Icons.check_circle_rounded,
                 color: AppColors.success,
-                size: 22,
+                size: AppSpacing.iconLead,
               ),
               const SizedBox(width: AppSpacing.xs),
               Text(
@@ -282,7 +282,7 @@ class _SuccessBody extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.sm),
           Text(
-            'Please run diagnostics again\nto verify the improvement.',
+            'Run diagnostics again to verify the improvement.',
             style: text.bodyMedium?.copyWith(
               color: AppColors.onSurfaceVariant,
               height: 1.45,
@@ -292,7 +292,7 @@ class _SuccessBody extends StatelessWidget {
           SizedBox(
             width: double.infinity,
             child: PrimaryButton(
-              label: 'Re-run diagnostics',
+              label: 'Run diagnostics again',
               icon: Icons.refresh_rounded,
               expanded: true,
               onPressed: onRerunDiagnostics,
@@ -325,7 +325,7 @@ class _LabeledBlock extends StatelessWidget {
             color: AppColors.onSurfaceMuted,
           ),
         ),
-        const SizedBox(height: 4),
+        const SizedBox(height: AppSpacing.xxs),
         Text(
           value,
           style: text.bodyMedium?.copyWith(

@@ -42,18 +42,18 @@ final class DashboardViewData {
     final connection = ConnectionStatusView(
       title: ipv4Ok ? 'Connected' : 'Connection needs a look',
       subtitle: ipv4Ok
-          ? 'Reachable · $hostname'
+          ? hostname
           : HumanMessage.fromProbeError(
               meta['ipv4_error'],
-              fallback: 'Couldn’t confirm a clear IPv4 path',
+              fallback: 'We couldn’t confirm IPv4.',
             ),
       tone: ipv4Ok ? StatusBadgeTone.success : StatusBadgeTone.warning,
-      badgeLabel: ipv4Ok ? 'Online' : 'Degraded',
+      badgeLabel: ipv4Ok ? 'Online' : 'Needs attention',
       details: [
         ConnectionDetailView(label: 'Target', value: hostname),
         ConnectionDetailView(label: 'IPv4', value: ipv4Address),
         ConnectionDetailView(
-          label: 'Edge status',
+          label: 'HTTPS',
           value: cloudflareStatus,
         ),
       ],
@@ -64,26 +64,26 @@ final class DashboardViewData {
       summary.addAll([
         const SummaryItemView(
           title: 'Routing',
-          detail: 'No route problems showed up in this check',
+          detail: 'No routing issues detected.',
           tone: StatusBadgeTone.success,
           badge: 'Healthy',
           icon: Icons.verified_outlined,
         ),
         SummaryItemView(
-          title: 'Confidence',
-          detail: '${(report.confidence * 100).round()}% sure about this reading',
+          title: 'Evidence',
+          detail: HumanMessage.confidenceBadge(report.confidence),
           tone: StatusBadgeTone.info,
-          badge: 'Stable',
+          badge: HumanMessage.confidenceStrength(report.confidence),
           icon: Icons.insights_outlined,
         ),
         SummaryItemView(
           title: 'Internet path',
           detail: ipv4TcpMs == null
-              ? 'Edge check completed'
-              : 'IPv4 connect $ipv4TcpMs ms · HTTPS '
+              ? 'Path check completed'
+              : 'IPv4 $ipv4TcpMs ms · HTTPS '
                   '${cloudflareHttpMs ?? cloudflareStatus}',
           tone: StatusBadgeTone.success,
-          badge: 'OK',
+          badge: 'Connected',
           icon: Icons.cloud_outlined,
         ),
       ]);
@@ -94,7 +94,7 @@ final class DashboardViewData {
             title: issue.title,
             detail: HumanMessage.fromProbeError(
               issue.description,
-              fallback: 'Something on this path needs attention',
+              fallback: 'Something on this path needs attention.',
             ),
             tone: _toneForSeverity(issue.severity),
             badge: HumanMessage.severityLabel(issue.severity.name),
@@ -105,7 +105,7 @@ final class DashboardViewData {
     }
 
     final finding = report.issues.isEmpty
-        ? 'Looking calm · ${report.health.label}'
+        ? 'Everything looks healthy'
         : report.issues.first.title;
 
     final created = report.createdAt.toLocal();
@@ -120,16 +120,30 @@ final class DashboardViewData {
             ? '${duration.inSeconds}s'
             : '${duration.inMilliseconds}ms';
 
+    final healthDetail = () {
+      final raw = report.health.summary?.trim() ?? '';
+      if (raw.toLowerCase().contains('all diagnosis rules passed') ||
+          report.issues.isEmpty) {
+        return 'Everything looks healthy.';
+      }
+      if (RegExp(r'^\d+\s+issues?\s+detected', caseSensitive: false)
+          .hasMatch(raw)) {
+        return 'A few paths may need attention.';
+      }
+      return raw.isEmpty
+          ? 'Based on your latest diagnostic run.'
+          : raw;
+    }();
+
     return DashboardViewData(
       healthScore: report.health.score,
-      healthLabel: report.health.label,
-      healthDetail: report.health.summary ??
-          'Routing health based on the latest diagnostic run.',
+      healthLabel: HumanMessage.scoreBadge(report.health.score),
+      healthDetail: healthDetail,
       healthTone: healthTone,
       connection: connection,
       summary: summary,
       recentScan: RecentScanView(
-        title: 'Diagnostic run',
+        title: 'Scan complete',
         timestamp: timestamp,
         duration: durationLabel,
         targets: int.tryParse(meta['rules_evaluated'] ?? '') ?? 5,
@@ -137,7 +151,7 @@ final class DashboardViewData {
         tone: report.issues.isEmpty
             ? StatusBadgeTone.success
             : StatusBadgeTone.warning,
-        badgeLabel: report.issues.isEmpty ? 'Clear' : 'Needs review',
+        badgeLabel: report.issues.isEmpty ? 'Healthy' : 'Needs attention',
       ),
       confidence: report.confidence,
     );

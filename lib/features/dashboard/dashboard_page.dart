@@ -6,6 +6,7 @@ import '../../application/diagnostics/diagnostics_coordinator.dart';
 import '../../design_system/design_system.dart';
 import '../../di/app_services.dart';
 import '../diagnostics/diagnostics_page.dart';
+import '../diagnostics/human_message.dart';
 import 'dashboard_view_data.dart';
 
 /// Premium network health report — powered by [DiagnosticsCoordinator].
@@ -86,9 +87,9 @@ class _DashboardPageState extends State<DashboardPage>
       return 'Couldn’t reach the network. Check your connection and try again.';
     }
     if (message.contains('TimeoutException') || message.contains('timed out')) {
-      return 'The diagnostic run timed out. Please try again.';
+      return 'This diagnostic run took too long. Please try again.';
     }
-    return 'Something went wrong while running diagnostics. Please retry.';
+    return 'Something went wrong while running diagnostics. Please try again.';
   }
 
   void _openDiagnostics() {
@@ -126,7 +127,7 @@ class _DashboardPageState extends State<DashboardPage>
             begin: Alignment.topCenter,
             end: Alignment.bottomCenter,
             colors: [
-              Color(0xFF101018),
+              AppColors.atmosphere,
               AppColors.background,
               AppColors.background,
             ],
@@ -202,17 +203,17 @@ class _DashboardPageState extends State<DashboardPage>
                             title: 'Overall health',
                             message: 'Running diagnostic checks…',
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.xl),
                           const _LoadingSection(
                             title: 'Connection status',
-                            message: 'Probing local paths…',
+                            message: 'Checking local paths…',
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.xl),
                           const _LoadingSection(
                             title: 'Quick summary',
                             message: 'Collecting service results…',
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.xl),
                           const _LoadingSection(
                             title: 'Recent scan',
                             message: 'Almost done…',
@@ -232,7 +233,7 @@ class _DashboardPageState extends State<DashboardPage>
                             interval: const Interval(0.08, 0.5),
                             child: _HealthScoreSection(data: data),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.xl),
                           _FadeSlide(
                             animation: _entrance,
                             interval: const Interval(0.16, 0.58),
@@ -240,13 +241,13 @@ class _DashboardPageState extends State<DashboardPage>
                               connection: data.connection,
                             ),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.xl),
                           _FadeSlide(
                             animation: _entrance,
                             interval: const Interval(0.24, 0.66),
                             child: _QuickSummarySection(items: data.summary),
                           ),
-                          const SizedBox(height: AppSpacing.lg),
+                          const SizedBox(height: AppSpacing.xl),
                           _FadeSlide(
                             animation: _entrance,
                             interval: const Interval(0.32, 0.74),
@@ -260,7 +261,7 @@ class _DashboardPageState extends State<DashboardPage>
                           child: SizedBox(
                             width: double.infinity,
                             child: PrimaryButton(
-                              label: 'Start Diagnosis',
+                              label: 'Start diagnostics',
                               icon: Icons.radar_rounded,
                               expanded: true,
                               onPressed: _loading ? null : _openDiagnostics,
@@ -351,9 +352,9 @@ class _LoadingSection extends StatelessWidget {
           Row(
             children: [
               const SizedBox(
-                width: 22,
-                height: 22,
-                child: CircularProgressIndicator(strokeWidth: 2.2),
+                width: AppSpacing.iconLead,
+                height: AppSpacing.iconLead,
+                child: CircularProgressIndicator(strokeWidth: 2),
               ),
               const SizedBox(width: AppSpacing.sm),
               Expanded(
@@ -406,7 +407,7 @@ class _ErrorSection extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.lg),
           SecondaryButton(
-            label: 'Retry',
+            label: 'Try again',
             icon: Icons.refresh_rounded,
             onPressed: onRetry,
           ),
@@ -461,19 +462,24 @@ class _HealthScoreSection extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: AppSpacing.md),
-                ClipRRect(
-                  borderRadius: AppRadius.pill,
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 6,
-                    backgroundColor: AppColors.surfaceHighest,
-                    color: barColor,
+                Semantics(
+                  label: 'Health score $score of 100',
+                  child: ClipRRect(
+                    borderRadius: AppRadius.pill,
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: AppSpacing.healthBar,
+                      backgroundColor: AppColors.surfaceHighest,
+                      color: barColor,
+                    ),
                   ),
                 ),
                 const SizedBox(height: AppSpacing.xs),
                 Text(
-                  'Score out of 100 · ${(data.confidence * 100).round()}% confidence',
-                  style: text.labelSmall,
+                  HumanMessage.confidenceBadge(data.confidence),
+                  style: text.labelSmall?.copyWith(
+                    color: AppColors.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -495,35 +501,41 @@ class _HealthRing extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      width: 128,
-      height: 128,
-      child: TweenAnimationBuilder<double>(
-        tween: Tween(begin: 0, end: progress),
-        duration: const Duration(milliseconds: 1100),
-        curve: Curves.easeOutCubic,
-        builder: (context, value, _) {
-          return CustomPaint(
-            painter: _RingPainter(progress: value),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    label,
-                    style: AppTypography.textTheme.headlineLarge?.copyWith(
-                      letterSpacing: -1.2,
+    return Semantics(
+      label: 'Health score $label',
+      child: SizedBox(
+        width: AppSpacing.healthRing,
+        height: AppSpacing.healthRing,
+        child: TweenAnimationBuilder<double>(
+          tween: Tween(begin: 0, end: progress),
+          duration: const Duration(milliseconds: 960),
+          curve: Curves.easeOutCubic,
+          builder: (context, value, _) {
+            return CustomPaint(
+              painter: _RingPainter(progress: value),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      label,
+                      style: AppTypography.textTheme.headlineLarge?.copyWith(
+                        letterSpacing: -1.2,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
-                  ),
-                  Text(
-                    'score',
-                    style: AppTypography.textTheme.labelSmall,
-                  ),
-                ],
+                    Text(
+                      'Health',
+                      style: AppTypography.textTheme.labelSmall?.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -537,8 +549,8 @@ class _RingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = (size.shortestSide / 2) - 8;
-    const stroke = 8.0;
+    final radius = (size.shortestSide / 2) - AppSpacing.healthRingStroke;
+    const stroke = AppSpacing.healthRingStroke;
 
     final track = Paint()
       ..color = AppColors.surfaceHighest
@@ -623,7 +635,7 @@ class _ConnectionStatusSection extends StatelessWidget {
                 child: Icon(
                   Icons.wifi_rounded,
                   color: iconColor,
-                  size: 22,
+                  size: AppSpacing.iconLead,
                 ),
               ),
               const SizedBox(width: AppSpacing.sm),
@@ -728,7 +740,11 @@ class _SummaryRow extends StatelessWidget {
             borderRadius: AppRadius.smAll,
             border: Border.all(color: AppColors.outlineSubtle),
           ),
-          child: Icon(item.icon, size: 20, color: AppColors.onSurfaceVariant),
+          child: Icon(
+            item.icon,
+            size: AppSpacing.iconRow,
+            color: AppColors.onSurfaceVariant,
+          ),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(

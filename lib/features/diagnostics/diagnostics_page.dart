@@ -229,7 +229,7 @@ class _DiagnosticsPageState extends State<DiagnosticsPage>
                           Text(
                             _finished
                                 ? 'Scan complete · open full results'
-                                : 'Watching each path come alive…',
+                                : 'Following each network step…',
                             style: text.bodySmall,
                             textAlign: TextAlign.center,
                           ),
@@ -315,7 +315,7 @@ class _Header extends StatelessWidget {
                       borderRadius: AppRadius.smAll,
                     ),
                   ),
-                  icon: const Icon(Icons.close_rounded, size: 20),
+                  icon: const Icon(Icons.close_rounded, size: AppSpacing.iconRow),
                 ),
                 const SizedBox(width: AppSpacing.sm),
                 Expanded(
@@ -324,7 +324,7 @@ class _Header extends StatelessWidget {
                     children: [
                       Text('Diagnostics', style: text.headlineSmall),
                       Text(
-                        'Quiet scan animation',
+                        'Checking each network path',
                         style: text.bodySmall,
                       ),
                     ],
@@ -390,7 +390,7 @@ class _Header extends StatelessWidget {
                 builder: (context, value, _) {
                   return LinearProgressIndicator(
                     value: value == 0 && running ? null : value,
-                    minHeight: 8,
+                    minHeight: AppSpacing.healthBar,
                     backgroundColor: AppColors.surfaceHighest,
                     color: AppColors.primary,
                   );
@@ -477,13 +477,13 @@ class _DiagnosticTile extends StatelessWidget {
                     Text(data.label, style: text.titleMedium),
                     const SizedBox(width: AppSpacing.xs),
                     AnimatedOpacity(
-                      duration: const Duration(milliseconds: 250),
+                      duration: const Duration(milliseconds: 200),
                       opacity: phase == _ItemPhase.done ? 1 : 0,
                       child: StatusBadge(
                         label: switch (data.outcome) {
-                          DiagnosticOutcome.success => 'OK',
-                          DiagnosticOutcome.warning => 'Watch',
-                          DiagnosticOutcome.info => 'Info',
+                          DiagnosticOutcome.success => 'Healthy',
+                          DiagnosticOutcome.warning => 'Needs attention',
+                          DiagnosticOutcome.info => 'Checked',
                         },
                         tone: switch (data.outcome) {
                           DiagnosticOutcome.success => StatusBadgeTone.success,
@@ -497,14 +497,14 @@ class _DiagnosticTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 AnimatedSwitcher(
-                  duration: const Duration(milliseconds: 280),
+                  duration: const Duration(milliseconds: 180),
                   switchInCurve: Curves.easeOut,
                   switchOutCurve: Curves.easeIn,
                   child: Text(
                     phase == _ItemPhase.done
                         ? data.result
                         : phase == _ItemPhase.running
-                            ? 'Probing ${data.subtitle.toLowerCase()}…'
+                            ? data.activeVerb
                             : data.subtitle,
                     key: ValueKey('${data.id}-$phase'),
                     style: text.bodySmall?.copyWith(
@@ -578,14 +578,14 @@ class _LeadingGlyph extends StatelessWidget {
         return Transform.scale(scale: scale, child: child);
       },
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 280),
+        duration: const Duration(milliseconds: 200),
         width: 46,
         height: 46,
         decoration: BoxDecoration(
           color: bg,
           borderRadius: AppRadius.mdAll,
         ),
-        child: Icon(data.icon, color: color, size: 22),
+        child: Icon(data.icon, color: color, size: AppSpacing.iconLead),
       ),
     );
   }
@@ -605,7 +605,7 @@ class _TrailingStatus extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return AnimatedSwitcher(
-      duration: const Duration(milliseconds: 320),
+      duration: const Duration(milliseconds: 200),
       transitionBuilder: (child, animation) {
         return ScaleTransition(
           scale: CurvedAnimation(parent: animation, curve: Curves.easeOutBack),
@@ -616,13 +616,13 @@ class _TrailingStatus extends StatelessWidget {
         _ItemPhase.waiting => Icon(
             Icons.circle_outlined,
             key: const ValueKey('wait'),
-            size: 20,
+            size: AppSpacing.iconRow,
             color: AppColors.outline,
           ),
         _ItemPhase.running => SizedBox(
             key: const ValueKey('run'),
-            width: 22,
-            height: 22,
+            width: AppSpacing.iconLead,
+            height: AppSpacing.iconLead,
             child: AnimatedBuilder(
               animation: pulse,
               builder: (context, _) {
@@ -637,7 +637,7 @@ class _TrailingStatus extends StatelessWidget {
                 ? Icons.error_outline_rounded
                 : Icons.check_circle_rounded,
             key: ValueKey('done-$outcome'),
-            size: 22,
+            size: AppSpacing.iconLead,
             color: outcome == DiagnosticOutcome.warning
                 ? AppColors.warning
                 : AppColors.success,

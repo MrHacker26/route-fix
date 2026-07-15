@@ -65,15 +65,19 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
                       borderRadius: AppRadius.mdAll,
                       border: Border.all(color: AppColors.outlineSubtle),
                     ),
-                    child: Icon(fix.icon, size: 22, color: AppColors.primary),
+                    child: Icon(
+                      fix.icon,
+                      size: AppSpacing.iconLead,
+                      color: AppColors.primary,
+                    ),
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Apply Fix?', style: text.titleLarge),
-                        const SizedBox(height: 2),
+                        Text('Apply fix?', style: text.titleLarge),
+                        const SizedBox(height: AppSpacing.xxs),
                         Text(
                           'Confirm before changing network settings.',
                           style: text.bodySmall?.copyWith(
@@ -137,7 +141,7 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
                     children: [
                       const Icon(
                         Icons.admin_panel_settings_outlined,
-                        size: 18,
+                        size: AppSpacing.iconInline,
                         color: AppColors.warning,
                       ),
                       const SizedBox(width: AppSpacing.xs),
@@ -156,7 +160,7 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
               ],
               const SizedBox(height: AppSpacing.md),
               Text(
-                        'Confirming will ask RouteFix to apply this change on your device.',
+                'Confirming will ask RouteFix to apply this change on your device.',
                 style: text.bodySmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                   height: 1.4,

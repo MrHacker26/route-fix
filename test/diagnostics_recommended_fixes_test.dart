@@ -50,7 +50,7 @@ void main() {
     );
     expect(selected.primary?.why, contains('TCP connect'));
     expect(selected.primary?.why, contains('slower than IPv4'));
-    expect(selected.primary?.confidenceLabel, '96%');
+    expect(selected.primary?.confidenceLabel, 'Strong');
     expect(selected.primary?.backedByRuleIds, contains('ipv6_latency'));
   });
 

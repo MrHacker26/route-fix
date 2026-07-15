@@ -189,7 +189,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                                 ),
                                 icon: const Icon(
                                   Icons.arrow_back_rounded,
-                                  size: 20,
+                                  size: AppSpacing.iconRow,
                                 ),
                               ),
                               const SizedBox(width: AppSpacing.sm),
@@ -213,12 +213,12 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                               ),
                               StatusBadge(
                                 label: _loading
-                                    ? 'Checking'
+                                    ? 'Investigating'
                                     : _error != null
-                                        ? 'Needs retry'
+                                        ? 'Needs attention'
                                         : _partial
-                                            ? 'Partial'
-                                            : 'Ready',
+                                            ? 'Needs attention'
+                                            : 'Healthy',
                                 tone: _loading
                                     ? StatusBadgeTone.info
                                     : _error != null
@@ -343,8 +343,8 @@ class _LoadingCard extends StatelessWidget {
       child: Row(
         children: [
           const SizedBox(
-            width: 20,
-            height: 20,
+            width: AppSpacing.iconRow,
+            height: AppSpacing.iconRow,
             child: CircularProgressIndicator(
               strokeWidth: 2,
               color: AppColors.primary,
@@ -438,40 +438,43 @@ class _HealthSection extends StatelessWidget {
             children: [
               Row(
                 children: [
-                  SizedBox(
-                    width: 112,
-                    height: 112,
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0, end: score / 100),
-                      duration: const Duration(milliseconds: 960),
-                      curve: Curves.easeOutCubic,
-                      builder: (context, value, _) {
-                        return CustomPaint(
-                          painter: _ScoreRingPainter(progress: value),
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Text(
-                                  '$score',
-                                  style: text.headlineMedium?.copyWith(
-                                    letterSpacing: -1.2,
-                                    fontFeatures: const [
-                                      FontFeature.tabularFigures(),
-                                    ],
+                  Semantics(
+                    label: 'Health score $score of 100',
+                    child: SizedBox(
+                      width: AppSpacing.healthRing,
+                      height: AppSpacing.healthRing,
+                      child: TweenAnimationBuilder<double>(
+                        tween: Tween(begin: 0, end: score / 100),
+                        duration: const Duration(milliseconds: 960),
+                        curve: Curves.easeOutCubic,
+                        builder: (context, value, _) {
+                          return CustomPaint(
+                            painter: _ScoreRingPainter(progress: value),
+                            child: Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '$score',
+                                    style: text.headlineMedium?.copyWith(
+                                      letterSpacing: -1.2,
+                                      fontFeatures: const [
+                                        FontFeature.tabularFigures(),
+                                      ],
+                                    ),
                                   ),
-                                ),
-                                Text(
-                                  'health',
-                                  style: text.labelSmall?.copyWith(
-                                    color: AppColors.onSurfaceMuted,
+                                  Text(
+                                    'Health',
+                                    style: text.labelSmall?.copyWith(
+                                      color: AppColors.onSurfaceVariant,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
-                          ),
-                        );
-                      },
+                          );
+                        },
+                      ),
                     ),
                   ),
                   const SizedBox(width: AppSpacing.lg),
@@ -488,9 +491,12 @@ class _HealthSection extends StatelessWidget {
                               ),
                             ),
                             StatusBadge(
-                              label:
-                                  '${(data.confidence * 100).round()}% sure',
-                              tone: data.scoreTone,
+                              label: HumanMessage.confidenceBadge(
+                                data.confidence,
+                              ),
+                              tone: DiagnosticsResultViewData.toneForConfidence(
+                                data.confidence,
+                              ),
                             ),
                           ],
                         ),
@@ -503,13 +509,16 @@ class _HealthSection extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(height: AppSpacing.md),
-                        ClipRRect(
-                          borderRadius: AppRadius.pill,
-                          child: LinearProgressIndicator(
-                            value: score / 100,
-                            minHeight: 5,
-                            backgroundColor: AppColors.surfaceHighest,
-                            color: barColor,
+                        Semantics(
+                          label: 'Health progress $score percent',
+                          child: ClipRRect(
+                            borderRadius: AppRadius.pill,
+                            child: LinearProgressIndicator(
+                              value: score / 100,
+                              minHeight: AppSpacing.healthBar,
+                              backgroundColor: AppColors.surfaceHighest,
+                              color: barColor,
+                            ),
                           ),
                         ),
                       ],
@@ -522,12 +531,23 @@ class _HealthSection extends StatelessWidget {
                 const Divider(height: 1, color: AppColors.outlineSubtle),
                 const SizedBox(height: AppSpacing.lg),
                 Text(
-                  'Network snapshot',
+                  'Network path',
                   style: text.titleSmall,
                 ),
                 const SizedBox(height: AppSpacing.sm),
                 for (var i = 0; i < data.networkMetrics.length; i++) ...[
-                  if (i > 0) const SizedBox(height: AppSpacing.sm),
+                  if (i > 0) ...[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        vertical: AppSpacing.xxs,
+                      ),
+                      child: Icon(
+                        Icons.south_rounded,
+                        size: 14,
+                        color: AppColors.onSurfaceMuted,
+                      ),
+                    ),
+                  ],
                   _MetricRow(metric: data.networkMetrics[i]),
                 ],
               ],
@@ -572,7 +592,11 @@ class _MetricRow extends StatelessWidget {
               color: accent.withValues(alpha: 0.14),
               borderRadius: AppRadius.smAll,
             ),
-            child: Icon(metric.icon, size: 18, color: accent),
+            child: Icon(
+              metric.icon,
+              size: AppSpacing.iconInline,
+              color: accent,
+            ),
           ),
           const SizedBox(width: AppSpacing.sm),
           Expanded(
@@ -593,6 +617,8 @@ class _MetricRow extends StatelessWidget {
           Text(
             metric.value,
             style: text.titleSmall?.copyWith(
+              fontFamily: 'Menlo',
+              fontFamilyFallback: const ['monospace'],
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
@@ -622,12 +648,14 @@ class _ProblemSection extends StatelessWidget {
               Row(
                 children: [
                   Text(
-                    problems.isEmpty ? 'Nothing standing out' : 'What we noticed',
+                    problems.isEmpty
+                        ? 'Everything looks healthy'
+                        : 'What we noticed',
                     style: text.titleMedium,
                   ),
                   const Spacer(),
                   StatusBadge(
-                    label: problems.isEmpty ? 'Clear' : '${problems.length}',
+                    label: problems.isEmpty ? 'Healthy' : '${problems.length}',
                     tone: problems.isEmpty
                         ? StatusBadgeTone.success
                         : StatusBadgeTone.warning,
@@ -636,12 +664,23 @@ class _ProblemSection extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.md),
               if (problems.isEmpty)
-                Text(
-                  'This check didn’t find a clear routing problem. That usually means everyday tools should feel fine.',
-                  style: text.bodyMedium?.copyWith(
-                    color: AppColors.onSurfaceVariant,
-                    height: 1.5,
-                  ),
+                Column(
+                  children: [
+                    Icon(
+                      Icons.check_circle_outline_rounded,
+                      size: 36,
+                      color: AppColors.success.withValues(alpha: 0.9),
+                    ),
+                    const SizedBox(height: AppSpacing.sm),
+                    Text(
+                      'We couldn’t find any routing issues during this scan.',
+                      textAlign: TextAlign.center,
+                      style: text.bodyMedium?.copyWith(
+                        color: AppColors.onSurfaceVariant,
+                        height: 1.5,
+                      ),
+                    ),
+                  ],
                 )
               else
                 for (var i = 0; i < problems.length; i++) ...[
@@ -679,7 +718,7 @@ class _ProblemRow extends StatelessWidget {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Icon(problem.icon, size: 20, color: accent),
+        Icon(problem.icon, size: AppSpacing.iconRow, color: accent),
         const SizedBox(width: AppSpacing.sm),
         Expanded(
           child: Column(
@@ -697,7 +736,7 @@ class _ProblemRow extends StatelessWidget {
                   ),
                 ],
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: AppSpacing.xxs),
               Text(
                 problem.detail,
                 style: text.bodySmall?.copyWith(
@@ -768,7 +807,11 @@ class _ImpactRow extends StatelessWidget {
 
     return Row(
       children: [
-        Icon(impact.icon, size: 18, color: AppColors.onSurfaceVariant),
+        Icon(
+          impact.icon,
+          size: AppSpacing.iconInline,
+          color: AppColors.onSurfaceVariant,
+        ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(child: Text(impact.name, style: text.titleSmall)),
         StatusBadge(label: impact.label, tone: tone, showDot: false),
@@ -803,10 +846,10 @@ class _RecommendationSection extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('No change needed right now', style: text.titleMedium),
+                Text('No recommendation available.', style: text.titleMedium),
                 const SizedBox(height: AppSpacing.sm),
                 Text(
-                  'This check didn’t point to an automatic fix. Keep an eye on speed and try again if something still feels off.',
+                  'No action required. We’ll only recommend a fix when we have strong evidence.',
                   style: text.bodyMedium?.copyWith(
                     color: AppColors.onSurfaceVariant,
                     height: 1.5,
@@ -865,12 +908,12 @@ class _TechnicalDetailsSection extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'For advanced users',
+                'Details',
                 style: AppTypography.textTheme.titleMedium,
               ),
               const SizedBox(height: AppSpacing.sm),
               Text(
-                'Raw check details stay tucked away unless you need them.',
+                'Stage timings, addresses, and rule evidence.',
                 style: AppTypography.textTheme.bodySmall?.copyWith(
                   color: AppColors.onSurfaceVariant,
                   height: 1.4,
@@ -894,6 +937,12 @@ class _TechnicalExpander extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
+    final mono = text.bodySmall?.copyWith(
+      fontFamily: 'Menlo',
+      fontFamilyFallback: const ['monospace'],
+      color: AppColors.onSurfaceVariant,
+      height: 1.45,
+    );
     return Theme(
       data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
       child: Material(
@@ -912,7 +961,7 @@ class _TechnicalExpander extends StatelessWidget {
             Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'No raw logs for this run.',
+                'No details for this run.',
                 style: text.bodySmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                 ),
@@ -920,19 +969,35 @@ class _TechnicalExpander extends StatelessWidget {
             )
           else
             for (final detail in details)
-              Padding(
-                padding: const EdgeInsets.only(bottom: AppSpacing.sm),
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: SelectableText(
-                    '${detail.label}: ${detail.value}',
-                    style: text.bodySmall?.copyWith(
-                      color: AppColors.onSurfaceVariant,
-                      height: 1.4,
+              if (detail.label.startsWith('—'))
+                Padding(
+                  padding: const EdgeInsets.only(
+                    top: AppSpacing.sm,
+                    bottom: AppSpacing.xs,
+                  ),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text(
+                      detail.label.replaceAll('—', '').trim(),
+                      style: text.labelMedium?.copyWith(
+                        color: AppColors.onSurface,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                Padding(
+                  padding: const EdgeInsets.only(bottom: AppSpacing.sm),
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: SelectableText(
+                      detail.value.isEmpty
+                          ? detail.label
+                          : '${detail.label}: ${detail.value}',
+                      style: mono,
                     ),
                   ),
                 ),
-              ),
         ],
       ),
       ),
@@ -948,8 +1013,8 @@ class _ScoreRingPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final center = Offset(size.width / 2, size.height / 2);
-    final radius = size.shortestSide / 2 - 8;
-    const stroke = 9.0;
+    final radius = size.shortestSide / 2 - AppSpacing.healthRingStroke;
+    const stroke = AppSpacing.healthRingStroke;
 
     final track = Paint()
       ..color = AppColors.surfaceHighest
@@ -960,10 +1025,11 @@ class _ScoreRingPainter extends CustomPainter {
     final sweep = Paint()
       ..shader = SweepGradient(
         colors: const [
-          AppColors.warning,
-          AppColors.primary,
+          AppColors.success,
           AppColors.tertiary,
+          AppColors.primary,
         ],
+        stops: const [0.0, 0.55, 1.0],
         transform: const GradientRotation(-math.pi / 2),
       ).createShader(Rect.fromCircle(center: center, radius: radius))
       ..style = PaintingStyle.stroke
