@@ -1,2 +1,4 @@
-/// Concrete service adapters will be declared here later.
+/// Concrete service adapters.
 library;
+
+export 'dns/dart_io_dns_lookup_service.dart';

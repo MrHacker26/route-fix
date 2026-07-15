@@ -1,7 +1,4 @@
-/// Data layer placeholders for future repository / service adapters.
-///
-/// Concrete implementations belong here later.
-/// Do not add network code in this layer until that work is requested.
+/// Data layer adapters (repositories / services).
 library;
 
 export 'repositories/repositories.dart';
