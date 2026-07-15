@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:route_fix/data/services/ipv6/dart_io_ipv6_connectivity_service.dart';
+import 'package:route_fix/domain/models/probe_stage.dart';
 
 void main() {
   const service = DartIoIpv6ConnectivityService();
@@ -15,7 +16,7 @@ void main() {
     expect(result.latency, isNull);
   });
 
-  test('connects to local IPv6 listener', () async {
+  test('connects to local IPv6 listener through DNS then TCP', () async {
     late final ServerSocket server;
     try {
       server = await ServerSocket.bind(InternetAddress.loopbackIPv6, 0);
@@ -34,6 +35,8 @@ void main() {
     expect(result.error, isNull);
     expect(result.resolvedAddress, isNotNull);
     expect(result.resolvedAddress!.contains(':'), isTrue);
+    expect(result.stageReached, ProbeStage.tcp);
+    expect(result.stageFailed, isNull);
     expect(result.latency, isNotNull);
     expect(result.latency! >= Duration.zero, isTrue);
   });

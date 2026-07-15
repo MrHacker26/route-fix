@@ -3,13 +3,14 @@ import 'dart:io';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:route_fix/core/errors/app_failure.dart';
 import 'package:route_fix/data/services/probe_failure_mapper.dart';
+import 'package:route_fix/domain/models/probe_stage.dart';
 
 void main() {
   group('ProbeFailureMapper', () {
     test('maps host-lookup sockets to DNSFailure', () {
       final failure = ProbeFailureMapper.fromSocketException(
         const SocketException('Failed host lookup: example.com'),
-        stage: ProbeSocketStage.tcp,
+        stage: ProbeStage.tcp,
       );
 
       expect(failure, isA<DNSFailure>());
@@ -18,10 +19,19 @@ void main() {
     test('maps connect sockets to TCPFailure', () {
       final failure = ProbeFailureMapper.fromSocketException(
         const SocketException('Connection refused'),
-        stage: ProbeSocketStage.tcp,
+        stage: ProbeStage.tcp,
       );
 
       expect(failure, isA<TCPFailure>());
+    });
+
+    test('maps TLS-stage sockets to TLSFailure', () {
+      final failure = ProbeFailureMapper.fromSocketException(
+        const SocketException('Connection reset by peer'),
+        stage: ProbeStage.tls,
+      );
+
+      expect(failure, isA<TLSFailure>());
     });
 
     test('maps handshake errors to TLSFailure', () {

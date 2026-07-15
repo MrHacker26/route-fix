@@ -1,20 +1,27 @@
 import 'dart:io';
 
-import '../../../core/errors/app_failure.dart';
+import '../../core/errors/app_failure.dart';
+import '../../domain/models/probe_stage.dart';
 
 /// Maps low-level I/O errors to structured [AppFailure] values.
 abstract final class ProbeFailureMapper {
   static AppFailure fromSocketException(
     SocketException error, {
-    required ProbeSocketStage stage,
+    required ProbeStage stage,
   }) {
     final message = error.message.trim().isEmpty
         ? _defaultMessage(stage)
         : error.message.trim();
     final lower = message.toLowerCase();
 
-    if (_looksLikeDns(lower) || stage == ProbeSocketStage.dns) {
+    if (_looksLikeDns(lower) || stage == ProbeStage.dns) {
       return DNSFailure(message);
+    }
+    if (stage == ProbeStage.tls) {
+      return TLSFailure(message);
+    }
+    if (stage == ProbeStage.http) {
+      return HTTPFailure(message);
     }
     return TCPFailure(message);
   }
@@ -56,16 +63,12 @@ abstract final class ProbeFailureMapper {
         lower.contains('no address associated with hostname');
   }
 
-  static String _defaultMessage(ProbeSocketStage stage) {
+  static String _defaultMessage(ProbeStage stage) {
     return switch (stage) {
-      ProbeSocketStage.dns => 'DNS resolution failed',
-      ProbeSocketStage.tcp => 'TCP connection failed',
+      ProbeStage.dns => 'DNS resolution failed',
+      ProbeStage.tcp => 'TCP connection failed',
+      ProbeStage.tls => 'TLS handshake failed',
+      ProbeStage.http => 'HTTP request failed',
     };
   }
-}
-
-/// Which connection stage produced a [SocketException].
-enum ProbeSocketStage {
-  dns,
-  tcp,
 }

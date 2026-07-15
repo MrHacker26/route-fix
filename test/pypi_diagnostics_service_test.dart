@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:route_fix/core/errors/app_failure.dart';
 import 'package:route_fix/data/services/pypi/dart_io_pypi_diagnostics_service.dart';
 import 'package:route_fix/domain/models/http_probe_result.dart';
+import 'package:route_fix/domain/models/probe_stage.dart';
 import 'package:route_fix/domain/services/http_probe_service.dart';
 
 void main() {
@@ -24,6 +25,8 @@ void main() {
     expect(result.index.httpStatus, 200);
     expect(result.index.latency, const Duration(milliseconds: 11));
     expect(result.index.error, isNull);
+    expect(result.index.stageReached, ProbeStage.http);
+    expect(result.index.stageFailed, isNull);
 
     expect(result.files.hostname, 'files.pythonhosted.org');
     expect(result.files.success, isTrue);
@@ -40,6 +43,8 @@ void main() {
     expect(result.index.success, isTrue);
     expect(result.files.success, isFalse);
     expect(result.files.error, isNotNull);
+    expect(result.files.stageReached, ProbeStage.http);
+    expect(result.files.stageFailed, ProbeStage.http);
     expect(result.success, isFalse);
   });
 }
@@ -61,6 +66,8 @@ class _FakeProbe implements HttpProbeService {
         success: false,
         latency: Duration(milliseconds: 40),
         httpStatus: 503,
+        stageReached: ProbeStage.http,
+        stageFailed: ProbeStage.http,
         failure: HTTPFailure('Unexpected HTTP status 503', statusCode: 503),
       );
     }
@@ -68,6 +75,7 @@ class _FakeProbe implements HttpProbeService {
       success: true,
       latency: Duration(milliseconds: 11),
       httpStatus: 200,
+      stageReached: ProbeStage.http,
     );
   }
 }

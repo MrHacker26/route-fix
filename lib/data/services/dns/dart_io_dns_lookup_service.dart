@@ -4,6 +4,7 @@ import 'dart:io';
 import '../../../core/abstractions/result.dart';
 import '../../../core/errors/app_failure.dart';
 import '../../../domain/models/dns_lookup_result.dart';
+import '../../../domain/models/probe_stage.dart';
 import '../../../domain/services/dns_lookup_service.dart';
 import '../probe_failure_mapper.dart';
 
@@ -23,7 +24,8 @@ class DartIoDnsLookupService implements DnsLookupService {
     try {
       final ipv4Future = _lookupFamily(host, InternetAddressType.IPv4);
       final ipv6Future = _lookupFamily(host, InternetAddressType.IPv6);
-      final results = await Future.wait<({List<String> addresses, AppFailure? failure})>([
+      final results =
+          await Future.wait<({List<String> addresses, AppFailure? failure})>([
         ipv4Future,
         ipv6Future,
       ]).timeout(const Duration(seconds: 10));
@@ -35,10 +37,8 @@ class DartIoDnsLookupService implements DnsLookupService {
       final dnsFailure = results[0].failure ?? results[1].failure;
 
       if (ipv4.isEmpty && ipv6.isEmpty) {
-        return Failure(
-          dnsFailure ??
-              DNSFailure('No addresses found for "$host"'),
-        );
+        final failure = dnsFailure ?? DNSFailure('No addresses found for "$host"');
+        return Failure(failure);
       }
 
       return Success(
@@ -47,6 +47,7 @@ class DartIoDnsLookupService implements DnsLookupService {
           ipv4Addresses: List.unmodifiable(ipv4),
           ipv6Addresses: List.unmodifiable(ipv6),
           lookupDuration: stopwatch.elapsed,
+          stageReached: ProbeStage.dns,
         ),
       );
     } on TimeoutException {
@@ -57,7 +58,7 @@ class DartIoDnsLookupService implements DnsLookupService {
       return Failure(
         ProbeFailureMapper.fromSocketException(
           error,
-          stage: ProbeSocketStage.dns,
+          stage: ProbeStage.dns,
         ),
       );
     } on ArgumentError catch (error) {
@@ -88,7 +89,7 @@ class DartIoDnsLookupService implements DnsLookupService {
         addresses: const <String>[],
         failure: ProbeFailureMapper.fromSocketException(
           error,
-          stage: ProbeSocketStage.dns,
+          stage: ProbeStage.dns,
         ),
       );
     }

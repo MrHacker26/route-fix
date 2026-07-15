@@ -1,4 +1,5 @@
 import '../../core/errors/app_failure.dart';
+import 'probe_stage.dart';
 
 /// HTTP probe outcome tagged with the target hostname.
 class HostHttpProbeResult {
@@ -8,15 +9,17 @@ class HostHttpProbeResult {
     this.latency,
     this.httpStatus,
     this.failure,
+    this.stageReached,
+    this.stageFailed,
   });
 
   final String hostname;
   final bool success;
   final Duration? latency;
   final int? httpStatus;
-
-  /// Structured failure when [success] is false.
   final AppFailure? failure;
+  final ProbeStage? stageReached;
+  final ProbeStage? stageFailed;
 
   /// Message form of [failure] for existing call sites.
   String? get error => failure?.message;
@@ -29,13 +32,9 @@ class PypiDiagnosticsResult {
     required this.files,
   });
 
-  /// Result for `pypi.org`.
   final HostHttpProbeResult index;
-
-  /// Result for `files.pythonhosted.org`.
   final HostHttpProbeResult files;
 
-  /// Both targets reachable with a successful HTTP status.
   bool get success => index.success && files.success;
 
   List<HostHttpProbeResult> get targets => [index, files];

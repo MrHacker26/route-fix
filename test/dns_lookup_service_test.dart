@@ -3,6 +3,7 @@ import 'package:route_fix/core/abstractions/result.dart';
 import 'package:route_fix/core/errors/app_failure.dart';
 import 'package:route_fix/data/services/dns/dart_io_dns_lookup_service.dart';
 import 'package:route_fix/domain/models/dns_lookup_result.dart';
+import 'package:route_fix/domain/models/probe_stage.dart';
 
 void main() {
   const service = DartIoDnsLookupService();
@@ -28,5 +29,8 @@ void main() {
       isTrue,
     );
     expect(lookup.lookupDuration >= Duration.zero, isTrue);
+    expect(lookup.latency, lookup.lookupDuration);
+    expect(lookup.stageReached, ProbeStage.dns);
+    expect(lookup.stageFailed, isNull);
   });
 }
