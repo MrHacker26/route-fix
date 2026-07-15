@@ -1,6 +1,6 @@
 import 'fix_action.dart';
 
-/// Outcome of attempting (or planning) a [FixActionKind].
+/// Outcome of attempting or planning a [FixActionKind].
 final class FixResult {
   const FixResult({
     required this.action,
@@ -8,6 +8,9 @@ final class FixResult {
     required this.executed,
     this.message,
     this.error,
+    this.executedCommand,
+    this.platform,
+    this.requiresElevation = false,
     this.metadata = const {},
   });
 
@@ -15,6 +18,9 @@ final class FixResult {
   factory FixResult.success(
     FixActionKind action, {
     required String message,
+    String? executedCommand,
+    FixPlatform? platform,
+    bool requiresElevation = false,
     Map<String, String> metadata = const {},
   }) {
     return FixResult(
@@ -22,6 +28,9 @@ final class FixResult {
       success: true,
       executed: true,
       message: message,
+      executedCommand: executedCommand,
+      platform: platform,
+      requiresElevation: requiresElevation,
       metadata: metadata,
     );
   }
@@ -32,6 +41,9 @@ final class FixResult {
     required String message,
     String? error,
     bool executed = true,
+    String? executedCommand,
+    FixPlatform? platform,
+    bool requiresElevation = false,
     Map<String, String> metadata = const {},
   }) {
     return FixResult(
@@ -40,6 +52,33 @@ final class FixResult {
       executed: executed,
       message: message,
       error: error,
+      executedCommand: executedCommand,
+      platform: platform,
+      requiresElevation: requiresElevation,
+      metadata: metadata,
+    );
+  }
+
+  /// Fix is prepared for the host but was not executed.
+  factory FixResult.planned(
+    FixActionKind action, {
+    required String message,
+    required String executedCommand,
+    required FixPlatform platform,
+    bool requiresElevation = false,
+    String? error,
+    bool success = true,
+    Map<String, String> metadata = const {},
+  }) {
+    return FixResult(
+      action: action,
+      success: success,
+      executed: false,
+      message: message,
+      error: error,
+      executedCommand: executedCommand,
+      platform: platform,
+      requiresElevation: requiresElevation,
       metadata: metadata,
     );
   }
@@ -73,6 +112,7 @@ final class FixResult {
       action: action,
       success: false,
       executed: false,
+      platform: platform,
       error: 'Fix "${action.name}" is unsupported on ${platform.name}.',
     );
   }
@@ -97,6 +137,16 @@ final class FixResult {
 
   final String? message;
   final String? error;
+
+  /// Command that was run, or the prepared command when [executed] is false.
+  final String? executedCommand;
+
+  /// Platform this result applies to.
+  final FixPlatform? platform;
+
+  /// Whether applying [executedCommand] needs elevated privileges.
+  final bool requiresElevation;
+
   final Map<String, String> metadata;
 
   @override
@@ -106,9 +156,21 @@ final class FixResult {
         other.success == success &&
         other.executed == executed &&
         other.message == message &&
-        other.error == error;
+        other.error == error &&
+        other.executedCommand == executedCommand &&
+        other.platform == platform &&
+        other.requiresElevation == requiresElevation;
   }
 
   @override
-  int get hashCode => Object.hash(action, success, executed, message, error);
+  int get hashCode => Object.hash(
+        action,
+        success,
+        executed,
+        message,
+        error,
+        executedCommand,
+        platform,
+        requiresElevation,
+      );
 }
