@@ -1,4 +1,4 @@
-/// Auto Fix data adapters — platform stubs (no command execution).
+/// Auto Fix data adapters — platform providers.
 library;
 
 export 'linux_fix_provider.dart';

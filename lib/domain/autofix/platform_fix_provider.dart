@@ -5,7 +5,7 @@ import 'models/fix_result.dart';
 /// Shared Auto Fix catalog + platform gating.
 ///
 /// Concrete Linux / macOS / Windows providers extend this type.
-/// No provider in the foundation layer executes system commands.
+/// Platform adapters may execute system commands from [applyStub].
 abstract base class PlatformFixProvider implements FixProvider {
   const PlatformFixProvider();
 
@@ -99,12 +99,11 @@ abstract base class PlatformFixProvider implements FixProvider {
       FixAvailability.comingSoon => FixResult.comingSoon(kind),
       FixAvailability.unsupported => FixResult.unsupported(kind, platform),
       FixAvailability.available || FixAvailability.requiresElevation =>
-        // Foundation: never mutate the host.
         applyStub(kind),
     };
   }
 
-  /// Platform-specific hook. Must not run system commands in the foundation.
+  /// Platform-specific hook — may run system commands when implemented.
   Future<FixResult> applyStub(FixActionKind kind);
 
   FixAvailability _availabilityFor(FixAction action) {

@@ -1,8 +1,6 @@
 import 'fix_action.dart';
 
 /// Outcome of attempting (or planning) a [FixActionKind].
-///
-/// Foundation builds never set [executed] to true.
 final class FixResult {
   const FixResult({
     required this.action,
@@ -12,6 +10,39 @@ final class FixResult {
     this.error,
     this.metadata = const {},
   });
+
+  /// Fix ran and applied successfully.
+  factory FixResult.success(
+    FixActionKind action, {
+    required String message,
+    Map<String, String> metadata = const {},
+  }) {
+    return FixResult(
+      action: action,
+      success: true,
+      executed: true,
+      message: message,
+      metadata: metadata,
+    );
+  }
+
+  /// Fix was attempted (or rejected) and did not apply.
+  factory FixResult.failure(
+    FixActionKind action, {
+    required String message,
+    String? error,
+    bool executed = true,
+    Map<String, String> metadata = const {},
+  }) {
+    return FixResult(
+      action: action,
+      success: false,
+      executed: executed,
+      message: message,
+      error: error,
+      metadata: metadata,
+    );
+  }
 
   /// Successful dry-run / catalog acknowledgement (no system change).
   factory FixResult.acknowledged(
@@ -61,9 +92,7 @@ final class FixResult {
   /// Whether the provider considers the request fulfilled.
   final bool success;
 
-  /// Whether any host configuration was actually changed.
-  ///
-  /// Must remain `false` until real platform adapters are implemented.
+  /// Whether a platform command was invoked (success or failure).
   final bool executed;
 
   final String? message;
