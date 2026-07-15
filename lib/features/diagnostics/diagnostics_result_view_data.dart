@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../design_system/design_system.dart';
 import '../../domain/autofix/fix_provider.dart';
 import '../../domain/autofix/models/fix_action.dart';
+import '../../domain/models/diagnostics/diagnostic_issue.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import '../../domain/models/diagnostics/diagnostic_severity.dart';
 
@@ -123,11 +124,32 @@ final class DiagnosticsResultViewData {
       if (action.availability == FixAvailability.unsupported) continue;
       if (!action.relatedIssueCodes.any(issueCodes.contains)) continue;
 
+      final relatedIssues = report.issues
+          .where(
+            (issue) => action.relatedIssueCodes.contains(issue.code ?? issue.id),
+          )
+          .toList(growable: false);
+
       views.add(
         RecommendedFixView(
           id: action.id,
+          kind: action.kind,
           title: action.title,
           description: action.description,
+          why: _whyFor(
+            action: action,
+            report: report,
+            relatedIssues: relatedIssues,
+          ),
+          confidenceLabel: _confidenceLabel(
+            report: report,
+            relatedIssues: relatedIssues,
+          ),
+          estimatedImprovement: _estimatedImprovement(
+            action: action,
+            report: report,
+            relatedIssues: relatedIssues,
+          ),
           availabilityLabel: _availabilityLabel(action.availability),
           availabilityTone: _availabilityTone(action.availability),
           icon: _iconForFix(action.kind),
@@ -139,6 +161,73 @@ final class DiagnosticsResultViewData {
       );
     }
     return List.unmodifiable(views);
+  }
+
+  static String _whyFor({
+    required FixAction action,
+    required DiagnosticReport report,
+    required List<DiagnosticIssue> relatedIssues,
+  }) {
+    if (action.kind == FixActionKind.disableIpv6) {
+      final ipv4Ms = double.tryParse(report.metadata['ipv4_latency_ms'] ?? '');
+      final ipv6Ms = double.tryParse(report.metadata['ipv6_latency_ms'] ?? '');
+      if (ipv4Ms != null && ipv6Ms != null && ipv4Ms > 0 && ipv6Ms > ipv4Ms) {
+        final ratio = ipv6Ms / ipv4Ms;
+        final formatted = ratio >= 10
+            ? ratio.round().toString()
+            : (ratio >= 2
+                ? ratio.round().toString()
+                : ratio.toStringAsFixed(1));
+        return 'Your IPv6 latency is $formatted× higher than IPv4.';
+      }
+    }
+
+    if (relatedIssues.isNotEmpty) {
+      return relatedIssues.first.description;
+    }
+
+    return action.description;
+  }
+
+  static String _confidenceLabel({
+    required DiagnosticReport report,
+    required List<DiagnosticIssue> relatedIssues,
+  }) {
+    var confidence = report.confidence;
+    for (final issue in relatedIssues) {
+      final parsed = double.tryParse(issue.metadata['rule_confidence'] ?? '');
+      if (parsed != null && parsed > confidence) {
+        confidence = parsed;
+      }
+    }
+    return '${(confidence * 100).round()}%';
+  }
+
+  static String _estimatedImprovement({
+    required FixAction action,
+    required DiagnosticReport report,
+    required List<DiagnosticIssue> relatedIssues,
+  }) {
+    if (action.kind == FixActionKind.disableIpv6) {
+      final ipv4Ms = double.tryParse(report.metadata['ipv4_latency_ms'] ?? '');
+      final ipv6Ms = double.tryParse(report.metadata['ipv6_latency_ms'] ?? '');
+      if (ipv4Ms != null && ipv6Ms != null && ipv4Ms > 0) {
+        final ratio = ipv6Ms / ipv4Ms;
+        if (ratio >= 5) return 'High';
+        if (ratio >= 2) return 'Medium';
+        return 'Low';
+      }
+    }
+
+    if (relatedIssues.isEmpty) return 'Medium';
+    final worst = relatedIssues
+        .map((issue) => issue.severity)
+        .reduce((a, b) => a.index >= b.index ? a : b);
+    return switch (worst) {
+      DiagnosticSeverity.critical || DiagnosticSeverity.high => 'High',
+      DiagnosticSeverity.medium => 'Medium',
+      DiagnosticSeverity.low || DiagnosticSeverity.info => 'Low',
+    };
   }
 
   static String _availabilityLabel(FixAvailability availability) {
@@ -444,8 +533,12 @@ class RecommendationView {
 class RecommendedFixView {
   const RecommendedFixView({
     required this.id,
+    required this.kind,
     required this.title,
     required this.description,
+    required this.why,
+    required this.confidenceLabel,
+    required this.estimatedImprovement,
     required this.availabilityLabel,
     required this.availabilityTone,
     required this.icon,
@@ -454,8 +547,19 @@ class RecommendedFixView {
   });
 
   final String id;
+  final FixActionKind kind;
   final String title;
   final String description;
+
+  /// Evidence-backed explanation shown under "Why?".
+  final String why;
+
+  /// Display confidence, e.g. `96%`.
+  final String confidenceLabel;
+
+  /// Expected impact label: High / Medium / Low.
+  final String estimatedImprovement;
+
   final String availabilityLabel;
   final StatusBadgeTone availabilityTone;
   final IconData icon;

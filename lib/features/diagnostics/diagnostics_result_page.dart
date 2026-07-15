@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import '../../application/diagnostics/diagnostics_coordinator.dart';
 import '../../design_system/design_system.dart';
 import '../../di/app_services.dart';
+import '../../domain/autofix/fix_provider.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import 'diagnostics_result_view_data.dart';
 import 'recommended_fix_card.dart';
@@ -274,6 +275,8 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                             interval: const Interval(0.42, 0.82),
                             child: _RecommendedFixesSection(
                               fixes: data.recommendedFixes,
+                              fixProvider: AppServices.fixProvider,
+                              onRerunDiagnostics: _loading ? null : _load,
                             ),
                           ),
                         ],
@@ -926,9 +929,15 @@ class _RecommendationTile extends StatelessWidget {
 }
 
 class _RecommendedFixesSection extends StatelessWidget {
-  const _RecommendedFixesSection({required this.fixes});
+  const _RecommendedFixesSection({
+    required this.fixes,
+    required this.fixProvider,
+    this.onRerunDiagnostics,
+  });
 
   final List<RecommendedFixView> fixes;
+  final FixProvider fixProvider;
+  final VoidCallback? onRerunDiagnostics;
 
   @override
   Widget build(BuildContext context) {
@@ -960,7 +969,11 @@ class _RecommendedFixesSection extends StatelessWidget {
         else
           for (var i = 0; i < fixes.length; i++) ...[
             if (i > 0) const SizedBox(height: AppSpacing.sm),
-            RecommendedFixCard(fix: fixes[i]),
+            RecommendedFixCard(
+              fix: fixes[i],
+              fixProvider: fixProvider,
+              onRerunDiagnostics: onRerunDiagnostics,
+            ),
           ],
       ],
     );

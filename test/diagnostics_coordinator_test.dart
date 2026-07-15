@@ -50,6 +50,9 @@ void main() {
     expect(report.health.score, greaterThanOrEqualTo(90));
     expect(report.metadata['target_hostname'], 'example.com');
     expect(report.metadata['ipv4_success'], 'true');
+    expect(report.metadata['ipv4_latency_ms'], '10');
+    expect(report.metadata['ipv6_success'], 'true');
+    expect(report.metadata['ipv6_latency_ms'], '12');
     expect(report.metadata['cloudflare_success'], 'true');
   });
 }

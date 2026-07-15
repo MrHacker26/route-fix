@@ -4,8 +4,6 @@ import '../../design_system/design_system.dart';
 import 'diagnostics_result_view_data.dart';
 
 /// Result of the Apply Fix confirmation dialog.
-///
-/// Confirmation does **not** execute a fix — it only records user intent.
 enum ApplyFixConfirmationResult {
   cancelled,
   confirmed,
@@ -14,7 +12,7 @@ enum ApplyFixConfirmationResult {
 /// Shows the Apply Fix confirmation dialog.
 ///
 /// Returns [ApplyFixConfirmationResult.confirmed] when the user confirms.
-/// Never runs Auto Fix.
+/// The caller is responsible for applying the fix via the platform provider.
 Future<ApplyFixConfirmationResult> showApplyFixConfirmation(
   BuildContext context, {
   required RecommendedFixView fix,
@@ -28,8 +26,6 @@ Future<ApplyFixConfirmationResult> showApplyFixConfirmation(
 }
 
 /// Confirmation dialog for applying a recommended Auto Fix.
-///
-/// Display and intent only — never executes a system fix.
 class ApplyFixConfirmationDialog extends StatelessWidget {
   const ApplyFixConfirmationDialog({
     super.key,
@@ -160,8 +156,8 @@ class ApplyFixConfirmationDialog extends StatelessWidget {
               ],
               const SizedBox(height: AppSpacing.md),
               Text(
-                'This confirmation does not change your network yet. '
-                'No fix will be executed from this dialog.',
+                'Confirming will ask the platform Auto Fix provider to apply '
+                'this change on your device.',
                 style: text.bodySmall?.copyWith(
                   color: AppColors.onSurfaceMuted,
                   height: 1.4,

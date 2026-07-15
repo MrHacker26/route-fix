@@ -3,6 +3,7 @@ import '../../domain/diagnosis/engine/diagnosis_observations.dart';
 import '../../domain/models/diagnostics/diagnostic_report.dart';
 import '../../domain/models/http_probe_result.dart';
 import '../../domain/models/ipv4_connectivity_result.dart';
+import '../../domain/models/ipv6_connectivity_result.dart';
 import '../../domain/services/cloudflare_diagnostics_service.dart';
 import '../../domain/services/dns_lookup_service.dart';
 import '../../domain/services/github_diagnostics_service.dart';
@@ -81,6 +82,7 @@ final class DefaultDiagnosticsCoordinator implements DiagnosticsCoordinator {
         ..._serviceMetadata(
           hostname: host,
           ipv4: ipv4,
+          ipv6: ipv6,
           cloudflare: cloudflare,
         ),
       },
@@ -90,6 +92,7 @@ final class DefaultDiagnosticsCoordinator implements DiagnosticsCoordinator {
   Map<String, String> _serviceMetadata({
     required String hostname,
     required Ipv4ConnectivityResult ipv4,
+    required Ipv6ConnectivityResult ipv6,
     required HttpProbeResult cloudflare,
   }) {
     return {
@@ -99,6 +102,11 @@ final class DefaultDiagnosticsCoordinator implements DiagnosticsCoordinator {
         'ipv4_latency_ms': '${ipv4.latency!.inMilliseconds}',
       if (ipv4.resolvedAddress != null) 'ipv4_address': ipv4.resolvedAddress!,
       if (ipv4.error != null) 'ipv4_error': ipv4.error!,
+      'ipv6_success': '${ipv6.success}',
+      if (ipv6.latency != null)
+        'ipv6_latency_ms': '${ipv6.latency!.inMilliseconds}',
+      if (ipv6.resolvedAddress != null) 'ipv6_address': ipv6.resolvedAddress!,
+      if (ipv6.error != null) 'ipv6_error': ipv6.error!,
       'cloudflare_success': '${cloudflare.success}',
       if (cloudflare.latency != null)
         'cloudflare_latency_ms': '${cloudflare.latency!.inMilliseconds}',

@@ -20,9 +20,14 @@ void main() {
           description: 'High latency',
           severity: DiagnosticSeverity.medium,
           code: 'ipv6_latency',
+          metadata: {'rule_confidence': '0.96'},
         ),
       ],
       recommendations: const [],
+      metadata: const {
+        'ipv4_latency_ms': '20',
+        'ipv6_latency_ms': '360',
+      },
     );
 
     final data = DiagnosticsResultViewData.fromReport(
@@ -30,15 +35,13 @@ void main() {
       fixProvider: const MacOsFixProvider(),
     );
 
-    expect(data.hasRecommendedFixes, isTrue);
-    expect(
-      data.recommendedFixes.map((f) => f.id),
-      contains('disableIpv6'),
-    );
-    expect(
-      data.recommendedFixes.map((f) => f.title),
-      contains('Disable IPv6'),
-    );
+    final disable = data.recommendedFixes
+        .firstWhere((fix) => fix.id == 'disableIpv6');
+
+    expect(disable.title, 'Disable IPv6');
+    expect(disable.why, 'Your IPv6 latency is 18× higher than IPv4.');
+    expect(disable.confidenceLabel, '96%');
+    expect(disable.estimatedImprovement, 'High');
   });
 
   test('returns no recommended fixes when there are no matching issues', () {
