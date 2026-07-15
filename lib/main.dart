@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'design_system/design_system.dart';
+import 'features/onboarding/onboarding_page.dart';
 
 void main() {
   runApp(const RouteFixApp());
@@ -17,7 +18,7 @@ class RouteFixApp extends StatelessWidget {
       theme: AppTheme.dark,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
-      home: const Scaffold(),
+      home: const OnboardingPage(),
     );
   }
 }
