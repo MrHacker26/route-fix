@@ -9,12 +9,14 @@ import '../rules/github_connectivity_rule.dart';
 import '../rules/ipv6_latency_rule.dart';
 import '../rules/ipv6_unavailable_rule.dart';
 import '../rules/pypi_latency_rule.dart';
+import 'diagnosis_evidence.dart';
 import 'diagnosis_observations.dart';
 import 'health_score_calculator.dart';
 
 /// Runs every diagnosis rule against service outputs and builds a report.
 ///
-/// Performs no network I/O.
+/// Performs no network I/O. Recommendations are emitted only when rule
+/// confidence clears [DiagnosisEvidence.highConfidenceFloor].
 final class DiagnosisEngine {
   DiagnosisEngine({
     DnsFailureRule? dnsFailureRule,
@@ -50,10 +52,12 @@ final class DiagnosisEngine {
     final createdAt = _clock();
     final stopwatch = Stopwatch()..start();
 
+    final dualStack = DualStackObservation.from(observations);
+
     final evaluations = <_RuleEvaluation>[
       _evaluate(_dnsFailureRule, observations.dnsLookup),
-      _evaluate(_ipv6UnavailableRule, observations.ipv6Connectivity),
-      _evaluate(_ipv6LatencyRule, observations.ipv6Connectivity),
+      _evaluate(_ipv6UnavailableRule, dualStack),
+      _evaluate(_ipv6LatencyRule, dualStack),
       _evaluate(_githubConnectivityRule, observations.githubProbe),
       _evaluate(_pypiLatencyRule, observations.pypiDiagnostics),
     ];
@@ -71,21 +75,12 @@ final class DiagnosisEngine {
       final issue = _issueFrom(evaluation);
       issues.add(issue);
 
-      final recommendation = evaluation.result.recommendation;
+      final recommendation = _gatedRecommendation(
+        evaluation.result,
+        relatedIssueId: issue.id,
+      );
       if (recommendation != null) {
-        recommendations.add(
-          Recommendation(
-            id: recommendation.id,
-            title: recommendation.title,
-            detail: recommendation.detail,
-            priority: recommendation.priority,
-            actionLabel: recommendation.actionLabel,
-            relatedIssueIds: recommendation.relatedIssueIds.isEmpty
-                ? [issue.id]
-                : recommendation.relatedIssueIds,
-            metadata: recommendation.metadata,
-          ),
-        );
+        recommendations.add(recommendation);
       }
     }
 
@@ -107,7 +102,32 @@ final class DiagnosisEngine {
       metadata: {
         'rules_evaluated': '${evaluations.length}',
         'rules_failed': '${issues.length}',
+        'recommendations_emitted': '${recommendations.length}',
       },
+    );
+  }
+
+  /// Drops recommendations that lack high confidence evidence.
+  Recommendation? _gatedRecommendation(
+    DiagnosisRuleResult result, {
+    required String relatedIssueId,
+  }) {
+    final recommendation = result.recommendation;
+    if (recommendation == null) return null;
+    if (!DiagnosisEvidence.isHighConfidence(result.confidence)) {
+      return null;
+    }
+
+    return Recommendation(
+      id: recommendation.id,
+      title: recommendation.title,
+      detail: recommendation.detail,
+      priority: recommendation.priority,
+      actionLabel: recommendation.actionLabel,
+      relatedIssueIds: recommendation.relatedIssueIds.isEmpty
+          ? [relatedIssueId]
+          : recommendation.relatedIssueIds,
+      metadata: recommendation.metadata,
     );
   }
 
@@ -127,6 +147,9 @@ final class DiagnosisEngine {
       metadata: {
         'rule': evaluation.rule.id,
         'rule_confidence': evaluation.result.confidence.toStringAsFixed(2),
+        if (recommendation != null &&
+            DiagnosisEvidence.isHighConfidence(evaluation.result.confidence))
+          'has_recommendation': 'true',
       },
     );
   }

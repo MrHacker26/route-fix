@@ -1,12 +1,15 @@
-import '../../models/diagnostics/diagnostic_severity.dart';
-import '../../models/diagnostics/recommendation.dart';
-import '../../models/ipv6_connectivity_result.dart';
+import '../engine/diagnosis_evidence.dart';
+import '../engine/diagnosis_observations.dart';
 import 'diagnosis_rule.dart';
 import 'diagnosis_rule_result.dart';
 
-/// Fails when IPv6 connectivity did not succeed.
+/// Observes IPv6 reachability.
+///
+/// Probe results alone never justify **Enable IPv6** (needs host-configuration
+/// evidence). Prefer IPv4 / Disable IPv6 is owned by [Ipv6LatencyRule] when
+/// dual-stack contrast is proven.
 final class Ipv6UnavailableRule
-    implements DiagnosisRule<Ipv6ConnectivityResult> {
+    implements DiagnosisRule<DualStackObservation> {
   const Ipv6UnavailableRule();
 
   @override
@@ -16,22 +19,24 @@ final class Ipv6UnavailableRule
   String get name => 'IPv6 unavailable';
 
   @override
-  DiagnosisRuleResult evaluate(Ipv6ConnectivityResult input) {
-    if (input.success && input.resolvedAddress != null) {
+  DiagnosisRuleResult evaluate(DualStackObservation input) {
+    final ipv6 = input.ipv6;
+
+    if (ipv6.success && ipv6.resolvedAddress != null) {
       return DiagnosisRuleResult.passed(confidence: 0.9);
     }
 
-    return DiagnosisRuleResult.failed(
-      confidence: 0.95,
-      recommendation: Recommendation(
-        id: 'ipv6-unavailable',
-        title: 'IPv6 isn’t available',
-        detail: input.error == null || input.error!.trim().isEmpty
-            ? 'This device couldn’t use an IPv6 path for the check. '
-                'Some services may fall back to IPv4 or feel inconsistent.'
-            : input.error!,
-        priority: DiagnosticSeverity.low,
-      ),
-    );
+    // Prefer IPv4 ownership — do not also emit ipv6_unavailable (Enable).
+    if (DiagnosisEvidence.canRecommendPreferIpv4(
+      dnsLookup: input.dnsLookup,
+      ipv4: input.ipv4,
+      ipv6: ipv6,
+    )) {
+      return DiagnosisRuleResult.passed(confidence: 0.88);
+    }
+
+    // Insufficient evidence for Enable IPv6 — pass so Autofix does not attach
+    // a contradictory Enable action to a generic or incomplete probe failure.
+    return DiagnosisRuleResult.passed(confidence: 0.55);
   }
 }

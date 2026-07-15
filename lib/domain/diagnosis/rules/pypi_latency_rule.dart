@@ -1,10 +1,14 @@
 import '../../models/diagnostics/diagnostic_severity.dart';
 import '../../models/diagnostics/recommendation.dart';
 import '../../models/pypi_diagnostics_result.dart';
+import '../engine/diagnosis_evidence.dart';
 import 'diagnosis_rule.dart';
 import 'diagnosis_rule_result.dart';
 
 /// Fails when any successful PyPI host probe exceeds [threshold] latency.
+///
+/// Recommendations require measured success latency — never generic failures
+/// on the slow host.
 final class PyPILatencyRule
     implements DiagnosisRule<PypiDiagnosticsResult> {
   const PyPILatencyRule({
@@ -25,6 +29,7 @@ final class PyPILatencyRule
 
     for (final target in input.targets) {
       if (!target.success || target.latency == null) continue;
+      if (DiagnosisEvidence.isGenericFailure(target.failure)) continue;
       if (target.latency! <= threshold) continue;
       if (slowest == null || target.latency! > slowest.latency!) {
         slowest = target;
@@ -35,17 +40,20 @@ final class PyPILatencyRule
       return DiagnosisRuleResult.passed(confidence: 0.8);
     }
 
+    const confidence = 0.88;
     return DiagnosisRuleResult.failed(
-      confidence: 0.88,
-      recommendation: Recommendation(
-        id: 'pypi-latency-high',
-        title: 'Python packages may download slowly',
-        detail:
-            '${slowest.hostname} took about '
-            '${slowest.latency!.inMilliseconds} ms to respond. '
-            'Installs and updates can feel slower than usual.',
-        priority: DiagnosticSeverity.medium,
-      ),
+      confidence: confidence,
+      recommendation: DiagnosisEvidence.isHighConfidence(confidence)
+          ? Recommendation(
+              id: 'pypi-latency-high',
+              title: 'Python packages may download slowly',
+              detail:
+                  '${slowest.hostname} took about '
+                  '${slowest.latency!.inMilliseconds} ms to respond. '
+                  'Installs and updates can feel slower than usual.',
+              priority: DiagnosticSeverity.medium,
+            )
+          : null,
     );
   }
 }

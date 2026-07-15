@@ -63,6 +63,7 @@ final class DefaultDiagnosticsCoordinator implements DiagnosticsCoordinator {
     final report = engine.analyze(
       DiagnosisObservations(
         dnsLookup: dnsResult,
+        ipv4Connectivity: ipv4,
         ipv6Connectivity: ipv6,
         githubProbe: github,
         pypiDiagnostics: pypi,
