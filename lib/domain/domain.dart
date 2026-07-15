@@ -1,6 +1,7 @@
 /// Domain layer — models, repository contracts, service contracts.
 library;
 
+export 'diagnosis/diagnosis.dart';
 export 'models/connection_status.dart';
 export 'models/diagnostic_check_result.dart';
 export 'models/diagnostic_target.dart';
