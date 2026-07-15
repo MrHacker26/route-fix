@@ -17,6 +17,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Desktop bundle identifiers no longer use placeholder `com.example` branding
+- Removed unused `android/` and `ios/` scaffolds (desktop-only product)
+- Simplified README
 
 ## [1.0.0] - 2026-07-15
 

@@ -32,9 +32,6 @@ flutter_launcher_icons:
     generate: true
   web:
     generate: true
-  ios:
-    generate: true
-  android: true
 
 flutter:
   uses-material-design: true

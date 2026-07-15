@@ -86,11 +86,16 @@ void main() {
 
     final first = service.apply(FixType.preferIpv4);
     await started.future;
+    expect(service.isBusy, isTrue);
+
     final second = await service.apply(FixType.preferIpv4);
     expect(second.success, isFalse);
-    expect(second.message, contains('already being applied'));
+    expect(second.message, contains('already in progress'));
+
     release.complete();
-    await first;
+    final firstResult = await first;
+    expect(firstResult.success, isTrue);
+    expect(service.isBusy, isFalse);
   });
 }
 
