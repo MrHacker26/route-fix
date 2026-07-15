@@ -60,6 +60,8 @@ flutter build linux --release
 
 Requires Flutter stable with desktop enabled (Dart 3.12+).
 
+Production packaging, installers, AppImage, and release tagging: [`docs/BUILD.md`](docs/BUILD.md).
+
 ---
 
 ## Screenshots
