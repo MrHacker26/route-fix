@@ -32,3 +32,12 @@ We value:
 - Beautiful typography
 
 Never generate code outside the requested task.
+
+## Engineering Rules
+
+- Never infer recommendations from generic failures.
+- Every recommendation must cite evidence.
+- Every latency label must describe what is actually measured.
+- Never display mocked values in production.
+- Prefer "Unknown" over an incorrect diagnosis.
+- It is better to return "Insufficient evidence" than a wrong fix.
