@@ -3,6 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:route_fix/features/dashboard/dashboard_page.dart';
 import 'package:route_fix/features/diagnostics/diagnostics_page.dart';
+import 'package:route_fix/features/diagnostics/diagnostics_result_page.dart';
 import 'package:route_fix/features/onboarding/onboarding_page.dart';
 import 'package:route_fix/main.dart';
 
@@ -59,5 +60,28 @@ void main() {
 
     await tester.pump(const Duration(milliseconds: 800));
     expect(find.text('Scanning'), findsOneWidget);
+  });
+
+  testWidgets('Results screen shows report sections', (WidgetTester tester) async {
+    await tester.pumpWidget(
+      const MaterialApp(home: DiagnosticsResultPage()),
+    );
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 1100));
+
+    expect(find.text('Scan results'), findsOneWidget);
+    expect(find.text('Overall score'), findsOneWidget);
+    expect(find.text('Latency by target'), findsOneWidget);
+    expect(find.text('Health cards'), findsOneWidget);
+
+    await tester.scrollUntilVisible(
+      find.text('Recommendations'),
+      200,
+      scrollable: find.byType(Scrollable).first,
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Detected issues'), findsOneWidget);
+    expect(find.text('Recommendations'), findsOneWidget);
   });
 }

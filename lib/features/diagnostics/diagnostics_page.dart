@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../design_system/design_system.dart';
 import 'diagnostics_catalog.dart';
+import 'diagnostics_result_page.dart';
 
 enum _ItemPhase { waiting, running, done }
 
@@ -223,12 +224,45 @@ class _DiagnosticsPageState extends State<DiagnosticsPage>
                     AnimatedOpacity(
                       duration: const Duration(milliseconds: 400),
                       opacity: _finished ? 1 : 0.45,
-                      child: Text(
-                        _finished
-                            ? 'Scan complete · presentation only'
-                            : 'Watching each path come alive…',
-                        style: text.bodySmall,
-                        textAlign: TextAlign.center,
+                      child: Column(
+                        children: [
+                          Text(
+                            _finished
+                                ? 'Scan complete · presentation only'
+                                : 'Watching each path come alive…',
+                            style: text.bodySmall,
+                            textAlign: TextAlign.center,
+                          ),
+                          if (_finished) ...[
+                            const SizedBox(height: AppSpacing.md),
+                            SizedBox(
+                              width: double.infinity,
+                              child: PrimaryButton(
+                                label: 'View results',
+                                icon: Icons.insights_rounded,
+                                expanded: true,
+                                onPressed: () {
+                                  Navigator.of(context).push(
+                                    PageRouteBuilder<void>(
+                                      transitionDuration: const Duration(
+                                        milliseconds: 420,
+                                      ),
+                                      pageBuilder: (context, animation, secondary) {
+                                        return FadeTransition(
+                                          opacity: CurvedAnimation(
+                                            parent: animation,
+                                            curve: Curves.easeOutCubic,
+                                          ),
+                                          child: const DiagnosticsResultPage(),
+                                        );
+                                      },
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ],
