@@ -78,7 +78,7 @@ final class WindowsFixProvider extends PlatformFixProvider {
       requiresElevation: true,
       metadata: {
         ...result.metadata,
-        if (planned != null) 'plannedCommand': planned,
+        'plannedCommand': ?planned,
       },
     );
   }

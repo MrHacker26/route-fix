@@ -75,9 +75,13 @@ jobs:
       - name: Resolve dependencies
         run: flutter pub get
 
+      # Fail on errors and warnings. Infos are non-fatal (Flutter defaults
+      # --fatal-infos to true, which would break CI on style-only findings).
+      # Fail on errors/warnings. Flutter defaults --fatal-infos=true, which
+      # fails CI on style-only infos — keep those non-fatal here.
       - name: Analyze
         if: inputs.run_quality_checks
-        run: flutter analyze --fatal-warnings
+        run: flutter analyze --fatal-warnings --no-fatal-infos
 
       - name: Test
         if: inputs.run_quality_checks

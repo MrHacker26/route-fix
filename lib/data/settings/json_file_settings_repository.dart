@@ -7,7 +7,7 @@ import '../../domain/repositories/settings_repository.dart';
 
 /// Persists [AppSettings] as JSON under the user config directory.
 final class JsonFileSettingsRepository implements SettingsRepository {
-  JsonFileSettingsRepository({Directory? this._directory});
+  JsonFileSettingsRepository({Directory? directory}) : _directory = directory;
 
   final Directory? _directory;
 
