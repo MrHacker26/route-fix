@@ -1,14 +1,22 @@
 import 'package:flutter/material.dart';
 
 import 'design_system/design_system.dart';
+import 'features/dashboard/dashboard_page.dart';
 import 'features/onboarding/onboarding_page.dart';
 
 void main() {
   runApp(const RouteFixApp());
 }
 
-class RouteFixApp extends StatelessWidget {
+class RouteFixApp extends StatefulWidget {
   const RouteFixApp({super.key});
+
+  @override
+  State<RouteFixApp> createState() => _RouteFixAppState();
+}
+
+class _RouteFixAppState extends State<RouteFixApp> {
+  bool _showOnboarding = true;
 
   @override
   Widget build(BuildContext context) {
@@ -18,7 +26,11 @@ class RouteFixApp extends StatelessWidget {
       theme: AppTheme.dark,
       darkTheme: AppTheme.dark,
       themeMode: ThemeMode.dark,
-      home: const OnboardingPage(),
+      home: _showOnboarding
+          ? OnboardingPage(
+              onFinished: () => setState(() => _showOnboarding = false),
+            )
+          : const DashboardPage(),
     );
   }
 }
