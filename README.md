@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://flutter.dev"><img src="https://img.shields.io/badge/Flutter-Desktop-02569B?style=flat-square&logo=flutter&logoColor=white" alt="Flutter Desktop"></a>
-  <img src="https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-111827?style=flat-square" alt="Platforms">
+  <img src="https://img.shields.io/badge/target-Desktop-111827?style=flat-square" alt="Desktop target">
   <img src="https://img.shields.io/badge/Dart-3.12%2B-0175C2?style=flat-square&logo=dart&logoColor=white" alt="Dart">
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="MIT License"></a>
   <a href="https://github.com/MrHacker26/route-fix/stargazers"><img src="https://img.shields.io/github/stars/MrHacker26/route-fix?style=flat-square" alt="Stars"></a>
@@ -80,6 +80,32 @@ Health score: **0–100** with labels Excellent · Good · Fair · Poor · Criti
 **Windows** — adapter IPv6 binding via PowerShell  
 
 Prefer IPv4 is recommended only when DNS and IPv4 succeed, and IPv6 fails or is much slower (roughly ≥ 3× IPv4 and ≥ 200 ms).
+
+---
+
+## Platform compatibility
+
+Status values reflect **actual verification**, not intended support.
+
+| Feature | macOS | Linux | Windows |
+|---------|-------|-------|---------|
+| Builds successfully | Verified | Not Verified | Not Verified |
+| Diagnostics | Verified | Not Verified | Not Verified |
+| DNS | Verified | Not Verified | Not Verified |
+| IPv4 | Verified | Not Verified | Not Verified |
+| IPv6 | Verified | Not Verified | Not Verified |
+| HTTPS | Verified | Not Verified | Not Verified |
+| GitHub | Verified | Not Verified | Not Verified |
+| PyPI | Verified | Not Verified | Not Verified |
+| Cloudflare | Verified | Not Verified | Not Verified |
+| Auto Fix | Not Verified | Not Verified | Not Verified |
+| Restore Defaults | Not Verified | Not Verified | Not Verified |
+
+**Verification notes**
+
+- **macOS** — `flutter build macos` succeeded; live diagnostic probes against public endpoints succeeded on this host.
+- **Linux / Windows** — Flutter desktop builds are host-OS-only (`flutter build linux` / `flutter build windows` cannot run from macOS). Not Verified here.
+- **Auto Fix / Restore Defaults** — Implemented for each desktop OS in source, but not exercised end-to-end in this verification pass (requires administrator elevation and changes host networking).
 
 ---
 
