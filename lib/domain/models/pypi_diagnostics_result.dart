@@ -1,3 +1,5 @@
+import '../../core/errors/app_failure.dart';
+
 /// HTTP probe outcome tagged with the target hostname.
 class HostHttpProbeResult {
   const HostHttpProbeResult({
@@ -5,14 +7,19 @@ class HostHttpProbeResult {
     required this.success,
     this.latency,
     this.httpStatus,
-    this.error,
+    this.failure,
   });
 
   final String hostname;
   final bool success;
   final Duration? latency;
   final int? httpStatus;
-  final String? error;
+
+  /// Structured failure when [success] is false.
+  final AppFailure? failure;
+
+  /// Message form of [failure] for existing call sites.
+  String? get error => failure?.message;
 }
 
 /// Combined PyPI index + files host probe results.

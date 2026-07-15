@@ -47,7 +47,7 @@ void main() {
       final result = rule.evaluate(
         const Ipv6ConnectivityResult(
           success: false,
-          error: 'No IPv6 address found',
+          failure: DNSFailure('No IPv6 address found'),
         ),
       );
 
@@ -61,7 +61,7 @@ void main() {
 
     test('fails on lookup failure', () {
       final result = rule.evaluate(
-        const Failure(UnavailableFailure('DNS lookup failed')),
+        const Failure(DNSFailure('DNS lookup failed')),
       );
 
       expect(result.failed, isTrue);
@@ -118,7 +118,7 @@ void main() {
         const HttpProbeResult(
           success: false,
           httpStatus: 503,
-          error: 'Unexpected HTTP status 503',
+          failure: HTTPFailure('Unexpected HTTP status 503', statusCode: 503),
         ),
       );
 

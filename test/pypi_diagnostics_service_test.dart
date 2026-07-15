@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:route_fix/core/errors/app_failure.dart';
 import 'package:route_fix/data/services/pypi/dart_io_pypi_diagnostics_service.dart';
 import 'package:route_fix/domain/models/http_probe_result.dart';
 import 'package:route_fix/domain/services/http_probe_service.dart';
@@ -60,7 +61,7 @@ class _FakeProbe implements HttpProbeService {
         success: false,
         latency: Duration(milliseconds: 40),
         httpStatus: 503,
-        error: 'Unexpected HTTP status 503',
+        failure: HTTPFailure('Unexpected HTTP status 503', statusCode: 503),
       );
     }
     return const HttpProbeResult(

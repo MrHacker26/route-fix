@@ -74,12 +74,12 @@ void main() {
         dnsLookup: const Failure(UnavailableFailure('DNS lookup failed')),
         ipv6Connectivity: const Ipv6ConnectivityResult(
           success: false,
-          error: 'No IPv6 address found',
+          failure: DNSFailure('No IPv6 address found'),
         ),
         githubProbe: const HttpProbeResult(
           success: false,
           httpStatus: 503,
-          error: 'Unexpected HTTP status 503',
+          failure: HTTPFailure('Unexpected HTTP status 503', statusCode: 503),
         ),
         pypiDiagnostics: const PypiDiagnosticsResult(
           index: HostHttpProbeResult(

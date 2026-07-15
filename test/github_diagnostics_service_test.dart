@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
+import 'package:route_fix/core/errors/app_failure.dart';
 import 'package:route_fix/data/services/github/dart_io_github_diagnostics_service.dart';
 import 'package:route_fix/data/services/http/dart_io_http_probe_service.dart';
 import 'package:route_fix/domain/models/http_probe_result.dart';
@@ -15,6 +16,7 @@ void main() {
 
       expect(result.success, isFalse);
       expect(result.error, 'URI must use http or https');
+      expect(result.failure, isA<UnknownFailure>());
     });
 
     test('probes local HTTP server', () async {

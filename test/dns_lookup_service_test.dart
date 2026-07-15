@@ -12,7 +12,7 @@ void main() {
 
     expect(result, isA<Failure<DnsLookupResult>>());
     final failure = result as Failure<DnsLookupResult>;
-    expect(failure.error, isA<UnexpectedFailure>());
+    expect(failure.error, isA<UnknownFailure>());
   });
 
   test('resolves localhost into addresses and duration', () async {

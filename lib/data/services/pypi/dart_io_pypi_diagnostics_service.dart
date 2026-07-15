@@ -48,7 +48,7 @@ class DartIoPypiDiagnosticsService implements PypiDiagnosticsService {
       success: probed.success,
       latency: probed.latency,
       httpStatus: probed.httpStatus,
-      error: probed.error,
+      failure: probed.failure,
     );
   }
 }

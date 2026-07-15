@@ -1,8 +1,10 @@
 import 'dart:async';
 import 'dart:io';
 
+import '../../../core/errors/app_failure.dart';
 import '../../../domain/models/ipv4_connectivity_result.dart';
 import '../../../domain/services/ipv4_connectivity_service.dart';
+import '../probe_failure_mapper.dart';
 
 /// IPv4 reachability via DNS lookup + TCP connect (`dart:io`).
 class DartIoIpv4ConnectivityService implements Ipv4ConnectivityService {
@@ -21,14 +23,14 @@ class DartIoIpv4ConnectivityService implements Ipv4ConnectivityService {
     if (host.isEmpty) {
       return const Ipv4ConnectivityResult(
         success: false,
-        error: 'Hostname must not be empty',
+        failure: UnknownFailure('Hostname must not be empty'),
       );
     }
 
     if (port < 1 || port > 65535) {
       return const Ipv4ConnectivityResult(
         success: false,
-        error: 'Port must be between 1 and 65535',
+        failure: UnknownFailure('Port must be between 1 and 65535'),
       );
     }
 
@@ -46,7 +48,7 @@ class DartIoIpv4ConnectivityService implements Ipv4ConnectivityService {
       if (ipv4.isEmpty) {
         return Ipv4ConnectivityResult(
           success: false,
-          error: 'No IPv4 address found for "$host"',
+          failure: DNSFailure('No IPv4 address found for "$host"'),
         );
       }
 
@@ -54,17 +56,20 @@ class DartIoIpv4ConnectivityService implements Ipv4ConnectivityService {
     } on TimeoutException {
       return const Ipv4ConnectivityResult(
         success: false,
-        error: 'IPv4 DNS lookup timed out',
+        failure: TimeoutFailure('IPv4 DNS lookup timed out'),
       );
     } on SocketException catch (error) {
       return Ipv4ConnectivityResult(
         success: false,
-        error: error.message.isEmpty ? 'IPv4 DNS lookup failed' : error.message,
+        failure: ProbeFailureMapper.fromSocketException(
+          error,
+          stage: ProbeSocketStage.dns,
+        ),
       );
     } catch (error) {
       return Ipv4ConnectivityResult(
         success: false,
-        error: error.toString(),
+        failure: ProbeFailureMapper.unknown(error),
       );
     }
 
@@ -89,24 +94,27 @@ class DartIoIpv4ConnectivityService implements Ipv4ConnectivityService {
       return Ipv4ConnectivityResult(
         success: false,
         latency: stopwatch.elapsed,
-        error: 'IPv4 connect timed out',
         resolvedAddress: address.address,
+        failure: const TimeoutFailure('IPv4 connect timed out'),
       );
     } on SocketException catch (error) {
       stopwatch.stop();
       return Ipv4ConnectivityResult(
         success: false,
         latency: stopwatch.elapsed,
-        error: error.message.isEmpty ? 'IPv4 connect failed' : error.message,
         resolvedAddress: address.address,
+        failure: ProbeFailureMapper.fromSocketException(
+          error,
+          stage: ProbeSocketStage.tcp,
+        ),
       );
     } catch (error) {
       stopwatch.stop();
       return Ipv4ConnectivityResult(
         success: false,
         latency: stopwatch.elapsed,
-        error: error.toString(),
         resolvedAddress: address.address,
+        failure: ProbeFailureMapper.unknown(error),
       );
     } finally {
       await socket?.close();
