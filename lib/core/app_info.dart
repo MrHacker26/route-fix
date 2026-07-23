@@ -7,8 +7,8 @@ import 'package:flutter/foundation.dart';
 /// Keep [version] / [build] aligned with `pubspec.yaml` (`version: x.y.z+build`).
 abstract final class AppInfo {
   static const String name = 'RouteFix';
-  static const String version = '1.0.0';
-  static const String build = '1';
+  static const String version = '1.1.0';
+  static const String build = '2';
   static const String versionLabel = '$version ($build)';
   static const String tagline =
       'Diagnose why developer services feel slow — even when bandwidth is fine.';

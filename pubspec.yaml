@@ -6,7 +6,7 @@ publish_to: 'none'
 
 # App version: MAJOR.MINOR.PATCH+BUILD (SemVer). Keep AppInfo in sync.
 # Release tags must match: vMAJOR.MINOR.PATCH (see .github/workflows/release.yml).
-version: 1.0.0+1
+version: 1.1.0+2
 
 environment:
   sdk: ^3.12.2
