@@ -66,4 +66,12 @@ final class AppSettingsController extends ChangeNotifier {
       (current) => current.copyWith(showTechnicalDetailsByDefault: value),
     );
   }
+
+  Future<void> setNetworkControlsIpv6Preference(String preferenceName) {
+    return update(
+      (current) => current.copyWith(
+        networkControlsIpv6Preference: preferenceName,
+      ),
+    );
+  }
 }

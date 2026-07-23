@@ -117,7 +117,7 @@ class _DashboardPageState extends State<DashboardPage>
     );
   }
 
-  void _openResults() {
+  void _openResults({bool focusRecommendation = false}) {
     Navigator.of(context).push(
       PageRouteBuilder<void>(
         transitionDuration: const Duration(milliseconds: 280),
@@ -128,7 +128,9 @@ class _DashboardPageState extends State<DashboardPage>
               parent: animation,
               curve: Curves.easeOutCubic,
             ),
-            child: const DiagnosticsResultPage(),
+            child: DiagnosticsResultPage(
+              focusRecommendation: focusRecommendation,
+            ),
           );
         },
       ),
@@ -293,6 +295,14 @@ class _DashboardPageState extends State<DashboardPage>
                                                           .recommendationAction,
                                                       lastVerified:
                                                           data.scannedAtLabel,
+                                                      onTap: data
+                                                                  .recommendationAction !=
+                                                              null
+                                                          ? () => _openResults(
+                                                                focusRecommendation:
+                                                                    true,
+                                                              )
+                                                          : null,
                                                     ),
                                                   ),
                                                   const SizedBox(
@@ -320,6 +330,14 @@ class _DashboardPageState extends State<DashboardPage>
                                                       .recommendationAction,
                                                   lastVerified:
                                                       data.scannedAtLabel,
+                                                  onTap: data
+                                                              .recommendationAction !=
+                                                          null
+                                                      ? () => _openResults(
+                                                            focusRecommendation:
+                                                                true,
+                                                          )
+                                                      : null,
                                                 ),
                                                 const SizedBox(
                                                   height: AppSpacing.sm,
@@ -941,6 +959,7 @@ class _RecommendationCard extends StatelessWidget {
     required this.tone,
     required this.lastVerified,
     this.action,
+    this.onTap,
   });
 
   final String title;
@@ -948,6 +967,7 @@ class _RecommendationCard extends StatelessWidget {
   final StatusBadgeTone tone;
   final String lastVerified;
   final String? action;
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -959,8 +979,9 @@ class _RecommendationCard extends StatelessWidget {
       StatusBadgeTone.warning => 'Attention',
       StatusBadgeTone.error => 'Attention',
     };
+    final tappable = onTap != null;
 
-    return GlassCard(
+    final card = GlassCard(
       padding: const EdgeInsets.all(AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1013,10 +1034,10 @@ class _RecommendationCard extends StatelessWidget {
                   size: AppSpacing.iconInline,
                   color: AppColors.primary,
                 ),
-                const SizedBox(width: AppSpacing.xs),
+                const SizedBox(width: AppSpacing.xxs),
                 Expanded(
                   child: Text(
-                    'Next · $action',
+                    tappable ? 'Tap to review fix' : 'Next · $action',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: text.labelSmall?.copyWith(
@@ -1025,10 +1046,31 @@ class _RecommendationCard extends StatelessWidget {
                     ),
                   ),
                 ),
+                if (tappable)
+                  Icon(
+                    Icons.chevron_right_rounded,
+                    size: AppSpacing.iconInline,
+                    color: AppColors.primary,
+                  ),
               ],
             ),
           ],
         ],
+      ),
+    );
+
+    if (!tappable) return card;
+
+    return Semantics(
+      button: true,
+      label: 'Recommendation: $title. Tap to review fix.',
+      child: MouseRegion(
+        cursor: SystemMouseCursors.click,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: card,
+        ),
       ),
     );
   }

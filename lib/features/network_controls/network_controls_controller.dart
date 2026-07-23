@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../domain/autofix/auto_fix_service.dart';
 import '../../domain/autofix/models/fix_action.dart';
 import '../../domain/autofix/models/fix_result.dart';
@@ -11,62 +13,104 @@ final class NetworkControlsController {
   NetworkControlsController({
     required AutoFixService autoFix,
     required Ipv6PreferenceProbe probe,
+    Future<Ipv6Preference?> Function()? readSavedSelection,
+    Future<void> Function(Ipv6Preference preference)? saveSelection,
   })  : _autoFix = autoFix,
-        _probe = probe;
+        _probe = probe,
+        _readSavedSelection = readSavedSelection,
+        _saveSelection = saveSelection;
 
   final AutoFixService _autoFix;
   final Ipv6PreferenceProbe _probe;
+  final Future<Ipv6Preference?> Function()? _readSavedSelection;
+  final Future<void> Function(Ipv6Preference preference)? _saveSelection;
 
   Ipv6Preference _detected = Ipv6Preference.unknown;
-  Ipv6Preference _selected = Ipv6Preference.automatic;
-  Ipv6Preference? _rememberedMode;
+  Ipv6Preference? _selected;
   String? _statusDetail;
   var _loading = false;
   var _applying = false;
+  var _selectionApplied = false;
 
+  /// OS-detected preference (shown in “Current state”).
   Ipv6Preference get detected => _detected;
-  Ipv6Preference get selected => _selected;
+
+  /// User choice — falls back to detected on first open when nothing is saved.
+  Ipv6Preference? get selected => _selected;
+
   String? get statusDetail => _statusDetail;
   bool get isLoading => _loading;
   bool get isApplying => _applying;
   bool get isBusy => _applying || _autoFix.isBusy;
 
-  /// True when the selection differs from the detected baseline.
+  /// True when the user picked something different from the detected baseline.
   bool get hasPendingChanges {
-    if (!_selected.isSelectable) return false;
+    if (_selectionApplied) return false;
+    final choice = _selected;
+    if (choice == null || !choice.isSelectable) return false;
     if (_detected == Ipv6Preference.unknown) {
-      return _selected != Ipv6Preference.automatic;
+      return choice != Ipv6Preference.automatic;
     }
-    return _selected != _detected;
+    return !_matchesDetected(choice);
   }
 
   bool get supportsPlatform =>
       _autoFix.supports(FixType.preferIpv4) ||
       _autoFix.supports(FixType.restoreDefault);
 
+  /// Probes the host and resolves the visible radio selection.
   Future<void> load() async {
     _loading = true;
     try {
-      final result = await _probe.detect();
-      var preference = result.preference;
-      if (_rememberedMode != null &&
-          (preference == Ipv6Preference.disableIpv6 ||
-              preference == Ipv6Preference.preferIpv4)) {
-        preference = _rememberedMode!;
-      }
-      _detected = preference;
-      _statusDetail = result.detail;
-      _selected = preference.isSelectable
-          ? preference
-          : Ipv6Preference.automatic;
+      await _refreshDetected();
+      await _resolveSelection();
     } finally {
       _loading = false;
     }
   }
 
+  /// Re-probes the host without changing the user's radio choice.
+  Future<void> refresh() async {
+    _loading = true;
+    try {
+      await _refreshDetected();
+      final choice = _selected;
+      if (choice != null) {
+        _selectionApplied = _matchesDetected(choice);
+      }
+    } finally {
+      _loading = false;
+    }
+  }
+
+  Future<void> _refreshDetected() async {
+    final result = await _probe.detect();
+    _detected = result.preference;
+    _statusDetail = result.detail;
+  }
+
+  Future<void> _resolveSelection() async {
+    final saved = _readSavedSelection != null
+        ? await _readSavedSelection!()
+        : null;
+
+    if (saved != null && saved.isSelectable) {
+      _selected = saved.normalizedSelection;
+    } else {
+      _selected = _detected.normalizedSelection;
+    }
+
+    _selectionApplied = _matchesDetected(_selected!);
+  }
+
   void select(Ipv6Preference preference) {
     if (!preference.isSelectable || _applying) return;
-    _selected = preference;
+    _selectionApplied = false;
+    _selected = preference.normalizedSelection;
+    final save = _saveSelection;
+    if (save != null) {
+      unawaited(save(preference));
+    }
   }
 
   Future<FixResult> applySelection({
@@ -81,29 +125,43 @@ final class NetworkControlsController {
       );
     }
 
+    final choice = _selected?.normalizedSelection;
+    if (choice == null) {
+      return FixResult.failure(
+        FixActionKind.disableIpv6,
+        message: 'Choose a preference first.',
+        executed: false,
+        platform: _autoFix.platform,
+      );
+    }
+
     _applying = true;
     try {
-      final result = switch (_selected) {
-        Ipv6Preference.automatic => await _autoFix.restoreDefault(
-            onPhase: onPhase,
-          ),
-        Ipv6Preference.preferIpv4 || Ipv6Preference.disableIpv6 =>
-          await _autoFix.apply(
-            FixType.preferIpv4,
-            onPhase: onPhase,
-          ),
-        Ipv6Preference.unknown => FixResult.failure(
-            FixActionKind.disableIpv6,
-            message: 'Choose a preference first.',
-            executed: false,
-            platform: _autoFix.platform,
-          ),
-      };
+      final FixResult result;
+      if (choice == Ipv6Preference.automatic) {
+        result = await _autoFix.restoreDefault(onPhase: onPhase);
+      } else if (choice == Ipv6Preference.preferIpv4) {
+        result = await _autoFix.apply(
+          FixType.preferIpv4,
+          onPhase: onPhase,
+        );
+      } else {
+        result = FixResult.failure(
+          FixActionKind.disableIpv6,
+          message: 'Choose a preference first.',
+          executed: false,
+          platform: _autoFix.platform,
+        );
+      }
 
       if (result.success) {
-        _rememberedMode =
-            _selected == Ipv6Preference.automatic ? null : _selected;
         await load();
+        _selected = choice.normalizedSelection;
+        _selectionApplied = true;
+        final save = _saveSelection;
+        if (save != null) {
+          await save(choice.normalizedSelection);
+        }
       }
       return result;
     } finally {
@@ -118,13 +176,29 @@ final class NetworkControlsController {
     try {
       final result = await _autoFix.restoreDefault(onPhase: onPhase);
       if (result.success) {
-        _rememberedMode = null;
-        _selected = Ipv6Preference.automatic;
         await load();
+        _selected = Ipv6Preference.automatic;
+        _selectionApplied = true;
+        final save = _saveSelection;
+        if (save != null) {
+          await save(Ipv6Preference.automatic);
+        }
       }
       return result;
     } finally {
       _applying = false;
     }
   }
+
+  bool _matchesDetected(Ipv6Preference choice) {
+    if (choice == _detected) return true;
+    if (_isPreferIpv4Family(choice) && _isPreferIpv4Family(_detected)) {
+      return true;
+    }
+    return false;
+  }
+
+  static bool _isPreferIpv4Family(Ipv6Preference preference) =>
+      preference == Ipv6Preference.preferIpv4 ||
+      preference == Ipv6Preference.disableIpv6;
 }

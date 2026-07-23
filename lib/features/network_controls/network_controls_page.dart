@@ -48,6 +48,16 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
             shell: const DartIoShellCommandExecutor(),
             autoFix: autoFix,
           ),
+          readSavedSelection: () async {
+            return parseStoredIpv6Preference(
+              AppServices.settings.settings.networkControlsIpv6Preference,
+            );
+          },
+          saveSelection: (preference) {
+            return AppServices.settings.setNetworkControlsIpv6Preference(
+              preference.name,
+            );
+          },
         );
     _boot();
   }
@@ -65,7 +75,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
       _failureMessage = null;
       _failureTechnical = null;
     });
-    await _controller.load();
+    await _controller.refresh();
     if (!mounted) return;
     setState(() => _booting = false);
   }
@@ -128,11 +138,6 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         );
       }
     });
-    if (result.success) {
-      if (AppServices.settings.settings.autoRerunAfterFixes) {
-        _runDiagnostics();
-      }
-    }
   }
 
   Future<void> _restore() async {
@@ -192,11 +197,6 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         );
       }
     });
-    if (result.success) {
-      if (AppServices.settings.settings.autoRerunAfterFixes) {
-        _runDiagnostics();
-      }
-    }
   }
 
   void _runDiagnostics() {
@@ -293,7 +293,7 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                               height: AppSpacing.lg,
                                             ),
                                             Text(
-                                              'IPv6',
+                                              'Connection preference',
                                               style:
                                                   text.labelMedium?.copyWith(
                                                 color:
@@ -305,11 +305,9 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                             const SizedBox(
                                               height: AppSpacing.sm,
                                             ),
-                                            for (final option in const [
-                                              Ipv6Preference.automatic,
-                                              Ipv6Preference.preferIpv4,
-                                              Ipv6Preference.disableIpv6,
-                                            ])
+                                            for (final option
+                                                in Ipv6PreferenceLabels
+                                                    .selectableOptions)
                                               _PreferenceOption(
                                                 preference: option,
                                                 groupValue:
@@ -656,7 +654,7 @@ class _PreferenceOption extends StatefulWidget {
   });
 
   final Ipv6Preference preference;
-  final Ipv6Preference groupValue;
+  final Ipv6Preference? groupValue;
   final bool enabled;
   final VoidCallback onSelected;
 
@@ -717,12 +715,27 @@ class _PreferenceOptionState extends State<_PreferenceOption> {
                   ),
                   const SizedBox(width: AppSpacing.sm),
                   Expanded(
-                    child: Text(
-                      widget.preference.optionLabel,
-                      style: text.titleSmall?.copyWith(
-                        fontWeight:
-                            selected ? FontWeight.w600 : FontWeight.w500,
-                      ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.preference.optionLabel,
+                          style: text.titleSmall?.copyWith(
+                            fontWeight:
+                                selected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                        if (widget.preference.optionDescription != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.preference.optionDescription!,
+                            style: text.bodySmall?.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ],

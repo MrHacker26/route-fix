@@ -162,105 +162,136 @@ class _RecommendationBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
+    final canTapCard = fix.canConfirmApply && !loading;
+
+    Widget headerAndBody = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          compact ? 'Suggestion' : 'Recommended',
+          style: text.labelMedium?.copyWith(
+            color: AppColors.onSurfaceMuted,
+            letterSpacing: 0.2,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpacing.xs),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                fix.title,
+                style: (compact ? text.titleMedium : text.titleLarge)
+                    ?.copyWith(fontWeight: FontWeight.w600),
+              ),
+            ),
+            const SizedBox(width: AppSpacing.sm),
+            StatusBadge(
+              label: fix.availabilityLabel,
+              tone: fix.availabilityTone,
+              showDot: false,
+            ),
+            if (canTapCard) ...[
+              const SizedBox(width: AppSpacing.xxs),
+              Icon(
+                Icons.touch_app_outlined,
+                size: AppSpacing.iconInline,
+                color: AppColors.onSurfaceMuted,
+              ),
+            ],
+          ],
+        ),
+        const SizedBox(height: AppSpacing.sm),
+        Text(
+          fix.description,
+          style: text.bodyMedium?.copyWith(
+            color: AppColors.onSurfaceVariant,
+            height: 1.45,
+          ),
+        ),
+        if (!compact) ...[
+          const SizedBox(height: AppSpacing.sm),
+          _LabeledBlock(label: 'Evidence', value: fix.why),
+          const SizedBox(height: AppSpacing.xs),
+          Text(
+            'Confidence · ${fix.confidenceLabel}',
+            style: text.labelSmall?.copyWith(
+              color: AppColors.onSurfaceMuted,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+        if (loading) ...[
+          const SizedBox(height: AppSpacing.lg),
+          InlineProgress(label: progressLabel),
+        ],
+        if (failureMessage != null) ...[
+          const SizedBox(height: AppSpacing.md),
+          Text(
+            failureMessage!,
+            style: text.bodySmall?.copyWith(
+              color: AppColors.error,
+              height: 1.4,
+            ),
+          ),
+          if (failureTechnical != null &&
+              failureTechnical!.isNotEmpty &&
+              failureTechnical != failureMessage)
+            Theme(
+              data: Theme.of(context)
+                  .copyWith(dividerColor: Colors.transparent),
+              child: Material(
+                color: Colors.transparent,
+                child: ExpansionTile(
+                  tilePadding: EdgeInsets.zero,
+                  title: Text(
+                    'Technical details',
+                    style:
+                        text.labelMedium?.copyWith(color: AppColors.primary),
+                  ),
+                  children: [
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: SelectableText(
+                        failureTechnical!,
+                        style: text.bodySmall?.copyWith(
+                          fontFamily: 'Menlo',
+                          fontFamilyFallback: const ['Consolas', 'monospace'],
+                          color: AppColors.onSurfaceMuted,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+
+    if (canTapCard) {
+      headerAndBody = Semantics(
+        button: true,
+        label: '${fix.title}. Tap to review and apply.',
+        child: MouseRegion(
+          cursor: SystemMouseCursors.click,
+          child: GestureDetector(
+            onTap: onApply,
+            behavior: HitTestBehavior.opaque,
+            child: headerAndBody,
+          ),
+        ),
+      );
+    }
 
     return GlassCard(
       padding: EdgeInsets.all(compact ? AppSpacing.sm : AppSpacing.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            compact ? 'Suggestion' : 'Recommended',
-            style: text.labelMedium?.copyWith(
-              color: AppColors.onSurfaceMuted,
-              letterSpacing: 0.2,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: AppSpacing.xs),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Text(
-                  fix.title,
-                  style: (compact ? text.titleMedium : text.titleLarge)
-                      ?.copyWith(fontWeight: FontWeight.w600),
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              StatusBadge(
-                label: fix.availabilityLabel,
-                tone: fix.availabilityTone,
-                showDot: false,
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpacing.sm),
-          Text(
-            fix.description,
-            style: text.bodyMedium?.copyWith(
-              color: AppColors.onSurfaceVariant,
-              height: 1.45,
-            ),
-          ),
-          if (!compact) ...[
-            const SizedBox(height: AppSpacing.sm),
-            _LabeledBlock(label: 'Evidence', value: fix.why),
-            const SizedBox(height: AppSpacing.xs),
-            Text(
-              'Confidence · ${fix.confidenceLabel}',
-              style: text.labelSmall?.copyWith(
-                color: AppColors.onSurfaceMuted,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ],
-          if (loading) ...[
-            const SizedBox(height: AppSpacing.lg),
-            InlineProgress(label: progressLabel),
-          ],
-          if (failureMessage != null) ...[
-            const SizedBox(height: AppSpacing.md),
-            Text(
-              failureMessage!,
-              style: text.bodySmall?.copyWith(
-                color: AppColors.error,
-                height: 1.4,
-              ),
-            ),
-            if (failureTechnical != null &&
-                failureTechnical!.isNotEmpty &&
-                failureTechnical != failureMessage)
-              Theme(
-                data: Theme.of(context)
-                    .copyWith(dividerColor: Colors.transparent),
-                child: Material(
-                  color: Colors.transparent,
-                  child: ExpansionTile(
-                    tilePadding: EdgeInsets.zero,
-                    title: Text(
-                      'Technical details',
-                      style:
-                          text.labelMedium?.copyWith(color: AppColors.primary),
-                    ),
-                    children: [
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: SelectableText(
-                          failureTechnical!,
-                          style: text.bodySmall?.copyWith(
-                            fontFamily: 'Menlo',
-                            fontFamilyFallback: const ['Consolas', 'monospace'],
-                            color: AppColors.onSurfaceMuted,
-                            height: 1.4,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
+          headerAndBody,
           const SizedBox(height: AppSpacing.lg),
           const Divider(height: 1, color: AppColors.outlineSubtle),
           const SizedBox(height: AppSpacing.lg),

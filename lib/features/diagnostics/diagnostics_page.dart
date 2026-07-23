@@ -242,7 +242,7 @@ class _DiagnosticsPageState extends State<DiagnosticsPage>
                                 icon: Icons.insights_rounded,
                                 expanded: true,
                                 onPressed: () {
-                                  Navigator.of(context).push(
+                                  Navigator.of(context).pushReplacement(
                                     PageRouteBuilder<void>(
                                       transitionDuration: const Duration(
                                         milliseconds: 420,

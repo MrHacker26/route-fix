@@ -22,6 +22,7 @@ class AppSettings {
     this.autoRerunAfterFixes = true,
     this.showTechnicalDetailsByDefault = false,
     this.preferredDnsHint,
+    this.networkControlsIpv6Preference,
   });
 
   final bool hasCompletedOnboarding;
@@ -38,6 +39,9 @@ class AppSettings {
 
   final String? preferredDnsHint;
 
+  /// Last IPv6 preference chosen in Network Controls ([Ipv6Preference.name]).
+  final String? networkControlsIpv6Preference;
+
   Duration get diagnosticsTimeout =>
       Duration(seconds: diagnosticsTimeoutSeconds.clamp(5, 30));
 
@@ -48,6 +52,7 @@ class AppSettings {
     bool? autoRerunAfterFixes,
     bool? showTechnicalDetailsByDefault,
     String? preferredDnsHint,
+    String? networkControlsIpv6Preference,
   }) {
     return AppSettings(
       hasCompletedOnboarding:
@@ -59,6 +64,8 @@ class AppSettings {
       showTechnicalDetailsByDefault:
           showTechnicalDetailsByDefault ?? this.showTechnicalDetailsByDefault,
       preferredDnsHint: preferredDnsHint ?? this.preferredDnsHint,
+      networkControlsIpv6Preference:
+          networkControlsIpv6Preference ?? this.networkControlsIpv6Preference,
     );
   }
 
@@ -69,6 +76,8 @@ class AppSettings {
         'autoRerunAfterFixes': autoRerunAfterFixes,
         'showTechnicalDetailsByDefault': showTechnicalDetailsByDefault,
         if (preferredDnsHint != null) 'preferredDnsHint': preferredDnsHint,
+        if (networkControlsIpv6Preference != null)
+          'networkControlsIpv6Preference': networkControlsIpv6Preference,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -86,6 +95,8 @@ class AppSettings {
       showTechnicalDetailsByDefault:
           json['showTechnicalDetailsByDefault'] as bool? ?? false,
       preferredDnsHint: json['preferredDnsHint'] as String?,
+      networkControlsIpv6Preference:
+          json['networkControlsIpv6Preference'] as String?,
     );
   }
 }

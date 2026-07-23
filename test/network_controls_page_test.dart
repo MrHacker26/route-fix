@@ -50,9 +50,10 @@ void main() {
     expect(find.text('Network Controls'), findsOneWidget);
     expect(find.text('Network'), findsOneWidget);
     expect(find.text('Choose how this device prefers network paths.'), findsOneWidget);
+    expect(find.text('Connection preference'), findsOneWidget);
     expect(find.text('Automatic'), findsWidgets);
     expect(find.text('Prefer IPv4'), findsOneWidget);
-    expect(find.text('Disable IPv6'), findsOneWidget);
+    expect(find.text('Disable IPv6'), findsNothing);
     expect(find.text('Apply'), findsOneWidget);
     expect(find.text('Restore defaults'), findsOneWidget);
 

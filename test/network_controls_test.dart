@@ -79,6 +79,31 @@ void main() {
   });
 
   group('NetworkControlsController', () {
+    test('pre-selects detected state on first open', () async {
+      final autoFix = _FakeAutoFix();
+      final controller = NetworkControlsController(
+        autoFix: autoFix,
+        probe: Ipv6PreferenceProbe(
+          shell: _FakeShell({
+            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
+              executable: 'sysctl',
+              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
+              exitCode: 0,
+              stdout: '0',
+              stderr: '',
+            ),
+          }),
+          autoFix: autoFix,
+          platformOverride: FixPlatform.linux,
+        ),
+      );
+
+      await controller.load();
+      expect(controller.detected, Ipv6Preference.automatic);
+      expect(controller.selected, Ipv6Preference.automatic);
+      expect(controller.hasPendingChanges, isFalse);
+    });
+
     test('Apply Changes stays disabled until selection changes', () async {
       final autoFix = _FakeAutoFix();
       final controller = NetworkControlsController(
@@ -100,13 +125,15 @@ void main() {
 
       await controller.load();
       expect(controller.detected, Ipv6Preference.automatic);
+      expect(controller.selected, Ipv6Preference.automatic);
       expect(controller.hasPendingChanges, isFalse);
 
       controller.select(Ipv6Preference.preferIpv4);
       expect(controller.hasPendingChanges, isTrue);
+      expect(controller.selected, Ipv6Preference.preferIpv4);
     });
 
-    test('Prefer IPv4 applies via AutoFixService.preferIpv4', () async {
+    test('restores saved selection on load', () async {
       final autoFix = _FakeAutoFix();
       final controller = NetworkControlsController(
         autoFix: autoFix,
@@ -123,14 +150,72 @@ void main() {
           autoFix: autoFix,
           platformOverride: FixPlatform.linux,
         ),
+        readSavedSelection: () async => Ipv6Preference.preferIpv4,
       );
 
       await controller.load();
-      controller.select(Ipv6Preference.disableIpv6);
+      expect(controller.detected, Ipv6Preference.automatic);
+      expect(controller.selected, Ipv6Preference.preferIpv4);
+      expect(controller.hasPendingChanges, isTrue);
+    });
+
+    test('Prefer IPv4 applies via AutoFixService.preferIpv4', () async {
+      Ipv6Preference? saved;
+      final autoFix = _FakeAutoFix();
+      final controller = NetworkControlsController(
+        autoFix: autoFix,
+        probe: Ipv6PreferenceProbe(
+          shell: _FakeShell({
+            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
+              executable: 'sysctl',
+              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
+              exitCode: 0,
+              stdout: '0',
+              stderr: '',
+            ),
+          }),
+          autoFix: autoFix,
+          platformOverride: FixPlatform.linux,
+        ),
+        saveSelection: (preference) async {
+          saved = preference;
+        },
+      );
+
+      await controller.load();
+      controller.select(Ipv6Preference.preferIpv4);
       final result = await controller.applySelection();
 
       expect(result.success, isTrue);
       expect(autoFix.applyCalls, [FixType.preferIpv4]);
+      expect(controller.selected, Ipv6Preference.preferIpv4);
+      expect(controller.hasPendingChanges, isFalse);
+      expect(saved, Ipv6Preference.preferIpv4);
+    });
+
+    test('maps detected IPv6 off to Prefer IPv4 selection', () async {
+      final autoFix = _FakeAutoFix();
+      final controller = NetworkControlsController(
+        autoFix: autoFix,
+        probe: Ipv6PreferenceProbe(
+          shell: _FakeShell({
+            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
+              executable: 'sysctl',
+              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
+              exitCode: 0,
+              stdout: '1',
+              stderr: '',
+            ),
+          }),
+          autoFix: autoFix,
+          platformOverride: FixPlatform.linux,
+        ),
+      );
+
+      await controller.load();
+      expect(controller.detected, Ipv6Preference.disableIpv6);
+      expect(controller.selected, Ipv6Preference.preferIpv4);
+      expect(controller.hasPendingChanges, isFalse);
     });
 
     test('Restore Defaults uses AutoFixService.restoreDefault', () async {
@@ -153,9 +238,31 @@ void main() {
       );
 
       await controller.load();
+      expect(controller.detected, Ipv6Preference.disableIpv6);
+      expect(controller.selected, Ipv6Preference.preferIpv4);
+      expect(controller.hasPendingChanges, isFalse);
+
+      controller.select(Ipv6Preference.automatic);
+      expect(controller.hasPendingChanges, isTrue);
       final result = await controller.restoreDefaults();
       expect(result.success, isTrue);
       expect(autoFix.restoreCalls, 1);
+      expect(controller.selected, Ipv6Preference.automatic);
+    });
+  });
+
+  group('parseStoredIpv6Preference', () {
+    test('parses valid stored values', () {
+      expect(
+        parseStoredIpv6Preference('preferIpv4'),
+        Ipv6Preference.preferIpv4,
+      );
+      expect(
+        parseStoredIpv6Preference('disableIpv6'),
+        Ipv6Preference.preferIpv4,
+      );
+      expect(parseStoredIpv6Preference('unknown'), isNull);
+      expect(parseStoredIpv6Preference(null), isNull);
     });
   });
 }

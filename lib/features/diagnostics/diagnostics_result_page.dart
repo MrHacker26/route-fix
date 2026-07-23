@@ -20,11 +20,15 @@ class DiagnosticsResultPage extends StatefulWidget {
     this.report,
     this.coordinator,
     this.onClose,
+    this.focusRecommendation = false,
   });
 
   final DiagnosticReport? report;
   final DiagnosticsCoordinator? coordinator;
   final VoidCallback? onClose;
+
+  /// Scrolls the recommendation section into view after results load.
+  final bool focusRecommendation;
 
   @override
   State<DiagnosticsResultPage> createState() => _DiagnosticsResultPageState();
@@ -33,6 +37,7 @@ class DiagnosticsResultPage extends StatefulWidget {
 class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
     with SingleTickerProviderStateMixin {
   late final AnimationController _entrance;
+  final _recommendationKey = GlobalKey();
 
   DiagnosticsResultViewData? _data;
   var _loading = true;
@@ -81,6 +86,22 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
     _entrance
       ..reset()
       ..forward();
+    _scheduleScrollToRecommendation();
+  }
+
+  void _scheduleScrollToRecommendation() {
+    if (!widget.focusRecommendation) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final target = _recommendationKey.currentContext;
+      if (target == null) return;
+      Scrollable.ensureVisible(
+        target,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+        alignment: 0.06,
+      );
+    });
   }
 
   Future<void> _load() async {
@@ -266,6 +287,7 @@ class _DiagnosticsResultPageState extends State<DiagnosticsResultPage>
                             _ProblemSection(problems: data.problems),
                             _ImpactSection(impacts: data.serviceImpacts),
                             _RecommendationSection(
+                              key: _recommendationKey,
                               primary: data.primaryFix,
                               secondary: data.secondaryFixes,
                               fixProvider: AppServices.fixProvider,
@@ -783,6 +805,7 @@ class _ImpactRow extends StatelessWidget {
 
 class _RecommendationSection extends StatelessWidget {
   const _RecommendationSection({
+    super.key,
     required this.primary,
     required this.secondary,
     required this.fixProvider,
