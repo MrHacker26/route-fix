@@ -90,17 +90,20 @@ final class NetworkControlsController {
   }
 
   Future<void> _resolveSelection() async {
-    final saved = _readSavedSelection != null
-        ? await _readSavedSelection!()
+    final readSavedSelection = _readSavedSelection;
+    final saved = readSavedSelection != null
+        ? await readSavedSelection()
         : null;
 
+    final Ipv6Preference selected;
     if (saved != null && saved.isSelectable) {
-      _selected = saved.normalizedSelection;
+      selected = saved.normalizedSelection;
     } else {
-      _selected = _detected.normalizedSelection;
+      selected = _detected.normalizedSelection;
     }
 
-    _selectionApplied = _matchesDetected(_selected!);
+    _selected = selected;
+    _selectionApplied = _matchesDetected(selected);
   }
 
   void select(Ipv6Preference preference) {
