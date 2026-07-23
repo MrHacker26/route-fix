@@ -26,7 +26,7 @@ void main() {
       expect(enable.availability, FixAvailability.requiresElevation);
     });
 
-    test('executes Prefer IPv4 via PowerShell argv', () async {
+    test('executes Prefer IPv4 via elevated PowerShell', () async {
       final commands = <List<String>>[];
       final provider = WindowsFixProvider(
         runProcess: (executable, arguments) async {
@@ -43,14 +43,16 @@ void main() {
       expect(result.requiresElevation, isTrue);
       expect(result.message, contains('Prefer IPv4'));
       expect(commands.single.first, 'powershell.exe');
-      expect(commands.single.join(' '), contains('Disable-NetAdapterBinding'));
-      expect(commands.single.join(' '), contains('ms_tcpip6'));
+      expect(commands.single.join(' '), contains('Start-Process'));
+      expect(commands.single.join(' '), contains('-Verb RunAs'));
+      expect(commands.single.join(' '), contains('-EncodedCommand'));
     });
 
-    test('executes restore via PowerShell', () async {
+    test('executes restore via elevated PowerShell', () async {
       final provider = WindowsFixProvider(
         runProcess: (executable, arguments) async {
-          expect(arguments.join(' '), contains('Enable-NetAdapterBinding'));
+          expect(arguments.join(' '), contains('Start-Process'));
+          expect(arguments.join(' '), contains('-Verb RunAs'));
           return ProcessResult(1, 0, '', '');
         },
       );
@@ -58,6 +60,19 @@ void main() {
       final result = await provider.apply(FixActionKind.enableIpv6);
       expect(result.success, isTrue);
       expect(result.message, contains('restored'));
+    });
+
+    test('returns UserCancelled when UAC is dismissed', () async {
+      final provider = WindowsFixProvider(
+        runProcess: (executable, arguments) async {
+          return ProcessResult(1, 1220, '', '');
+        },
+      );
+
+      final result = await provider.apply(FixActionKind.disableIpv6);
+      expect(result.wasCancelled, isTrue);
+      expect(result.success, isFalse);
+      expect(result.executed, isFalse);
     });
 
     test('maps permission failures to a calm message', () async {

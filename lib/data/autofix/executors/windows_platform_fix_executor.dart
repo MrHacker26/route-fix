@@ -4,18 +4,26 @@ import '../../../domain/autofix/models/fix_result.dart';
 import '../../../domain/autofix/models/fix_type.dart';
 import '../../../domain/autofix/platform_fix_executor.dart';
 import '../../../domain/autofix/shell_command_executor.dart';
+import 'windows_privileged_powershell.dart';
 
-/// Windows Auto Fix executor using PowerShell NetAdapterBinding.
+/// Windows Auto Fix executor using elevated PowerShell NetAdapterBinding.
 ///
 /// Discovers adapters dynamically — never hardcodes adapter names.
 final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
   WindowsPlatformFixExecutor({
     required ShellCommandExecutor shell,
-  }) : _shell = shell;
+    WindowsPrivilegedPowerShell? privileged,
+  }) : _privileged = privileged ?? WindowsPrivilegedPowerShell(shell: shell);
 
-  final ShellCommandExecutor _shell;
+  final WindowsPrivilegedPowerShell _privileged;
 
   static const _componentId = 'ms_tcpip6';
+
+  static const _disableScript =
+      r'Get-NetAdapter | ForEach-Object { Disable-NetAdapterBinding -Name $_.Name -ComponentID ms_tcpip6 -ErrorAction SilentlyContinue }';
+
+  static const _enableScript =
+      r'Get-NetAdapter | ForEach-Object { Enable-NetAdapterBinding -Name $_.Name -ComponentID ms_tcpip6 -ErrorAction SilentlyContinue }';
 
   @override
   FixPlatform get platform => FixPlatform.windows;
@@ -38,27 +46,12 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
   Future<FixResult> _setIpv6Binding({required bool enabled}) async {
     final kind =
         enabled ? FixActionKind.enableIpv6 : FixActionKind.disableIpv6;
+    final script = enabled ? _enableScript : _disableScript;
+    const executedCommand = 'powershell.exe -Verb RunAs';
 
-    // Constant script — no user input interpolation.
-    final script = enabled
-        ? 'Get-NetAdapter | ForEach-Object { '
-            'Enable-NetAdapterBinding -Name \$_.Name '
-            '-ComponentID ms_tcpip6 -ErrorAction SilentlyContinue }'
-        : 'Get-NetAdapter | ForEach-Object { '
-            'Disable-NetAdapterBinding -Name \$_.Name '
-            '-ComponentID ms_tcpip6 -ErrorAction SilentlyContinue }';
-
-    final args = <String>[
-      '-NoProfile',
-      '-ExecutionPolicy',
-      'Bypass',
-      '-Command',
-      script,
-    ];
-
-    late final ShellCommandResult result;
+    late final WindowsPrivilegedCommandResult result;
     try {
-      result = await _shell.run('powershell.exe', args);
+      result = await _privileged.runScript(script);
     } on AutoFixException catch (error) {
       return FixResult.failure(
         kind,
@@ -68,8 +61,44 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
         platform: platform,
         requiresElevation: true,
         metadata: {
-          'command': resultCommand(args),
+          'command': executedCommand,
           if (error.details != null) 'details': error.details!,
+        },
+      );
+    }
+
+    if (result.isCancelled) {
+      return FixResult.cancelled(
+        kind,
+        platform: platform,
+        executedCommand: result.executedCommand,
+        metadata: {
+          'command': executedCommand,
+          'componentId': _componentId,
+          if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+          if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+          'exitCode': '${result.exitCode}',
+        },
+      );
+    }
+
+    if (result.outcome == WindowsPrivilegedOutcome.authFailed) {
+      return FixResult.failure(
+        kind,
+        message: WindowsPrivilegedPowerShell.authFailureMessage(result.stderr),
+        error: result.stderr.isNotEmpty
+            ? result.stderr
+            : 'Administrator authentication failed.',
+        platform: platform,
+        requiresElevation: true,
+        executedCommand: result.executedCommand,
+        metadata: {
+          'command': executedCommand,
+          'componentId': _componentId,
+          if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+          if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+          'exitCode': '${result.exitCode}',
+          'outcome': 'AuthFailed',
         },
       );
     }
@@ -80,19 +109,15 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
           : (result.stdout.isNotEmpty
               ? result.stdout
               : 'exit code ${result.exitCode}');
-      final permission = detail.toLowerCase().contains('access') ||
-          detail.toLowerCase().contains('denied') ||
-          detail.toLowerCase().contains('administrator');
       return FixResult.failure(
         kind,
-        message: permission
-            ? 'Admin access is required.'
-            : 'Couldn’t update network settings.',
+        message: 'Couldn’t update network settings.',
         error: detail,
         platform: platform,
         requiresElevation: true,
+        executedCommand: result.executedCommand,
         metadata: {
-          'command': resultCommand(args),
+          'command': executedCommand,
           'exitCode': '${result.exitCode}',
           if (result.stdout.isNotEmpty) 'stdout': result.stdout,
           if (result.stderr.isNotEmpty) 'stderr': result.stderr,
@@ -108,16 +133,14 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
           : 'Prefer IPv4 is on.',
       platform: platform,
       requiresElevation: true,
-      executedCommand: resultCommand(args),
+      executedCommand: result.executedCommand,
       metadata: {
-        'command': resultCommand(args),
+        'command': executedCommand,
         'componentId': _componentId,
+        'elevated': 'true',
         if (result.stdout.isNotEmpty) 'stdout': result.stdout,
         if (result.stderr.isNotEmpty) 'stderr': result.stderr,
       },
     );
   }
-
-  static String resultCommand(List<String> args) =>
-      ['powershell.exe', ...args].join(' ');
 }

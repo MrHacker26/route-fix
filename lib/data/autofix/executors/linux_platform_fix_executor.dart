@@ -4,14 +4,16 @@ import '../../../domain/autofix/models/fix_result.dart';
 import '../../../domain/autofix/models/fix_type.dart';
 import '../../../domain/autofix/platform_fix_executor.dart';
 import '../../../domain/autofix/shell_command_executor.dart';
+import 'linux_privileged_sysctl.dart';
 
-/// Linux Auto Fix executor using `sysctl` (Ubuntu/Debian/Fedora/Arch).
+/// Linux Auto Fix executor using privileged `sysctl` via `pkexec`.
 final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
   LinuxPlatformFixExecutor({
     required ShellCommandExecutor shell,
-  }) : _shell = shell;
+    LinuxPrivilegedSysctl? privileged,
+  }) : _privileged = privileged ?? LinuxPrivilegedSysctl(shell: shell);
 
-  final ShellCommandExecutor _shell;
+  final LinuxPrivilegedSysctl _privileged;
 
   static const _preferSettings = <String>[
     'net.ipv6.conf.all.disable_ipv6=1',
@@ -54,64 +56,92 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
     required List<String> settings,
     required String successMessage,
   }) async {
-    final stdoutParts = <String>[];
-    final stderrParts = <String>[];
-    final commands = <String>[];
-
     for (final setting in settings) {
       if (!_isSafeSysctlAssignment(setting)) {
         throw const AutoFixValidationException(
           'Rejected unsafe sysctl assignment.',
         );
       }
-      final args = ['-w', setting];
-      commands.add('sysctl ${args.join(' ')}');
+    }
 
-      late final ShellCommandResult result;
-      try {
-        result = await _shell.run('sysctl', args);
-      } on AutoFixException catch (error) {
-        return FixResult.failure(
-          kind,
-          message: 'Couldn’t update network settings.',
-          error: error.message,
-          executed: false,
-          platform: platform,
-          requiresElevation: true,
-          metadata: {
-            'command': 'sysctl ${args.join(' ')}',
-            if (error.details != null) 'details': error.details!,
-          },
-        );
-      }
+    final commands = [
+      for (final setting in settings) 'sysctl -w $setting',
+    ];
 
-      if (result.stdout.isNotEmpty) stdoutParts.add(result.stdout);
-      if (result.stderr.isNotEmpty) stderrParts.add(result.stderr);
+    late final LinuxPrivilegedCommandResult result;
+    try {
+      result = await _privileged.runSettings(settings);
+    } on AutoFixException catch (error) {
+      return FixResult.failure(
+        kind,
+        message: 'Couldn’t update network settings.',
+        error: error.message,
+        executed: false,
+        platform: platform,
+        requiresElevation: true,
+        metadata: {
+          'commands': commands.join('; '),
+          if (error.details != null) 'details': error.details!,
+        },
+      );
+    }
 
-      if (!result.isSuccess) {
-        final detail = result.stderr.isNotEmpty
+    if (result.isCancelled) {
+      return FixResult.cancelled(
+        kind,
+        platform: platform,
+        executedCommand: result.executedCommand,
+        metadata: {
+          'commands': commands.join('; '),
+          'shellCommand': result.shellCommand,
+          if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+          if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+          'exitCode': '${result.exitCode}',
+        },
+      );
+    }
+
+    if (result.outcome == LinuxPrivilegedOutcome.authFailed) {
+      return FixResult.failure(
+        kind,
+        message: LinuxPrivilegedSysctl.authFailureMessage(result.stderr),
+        error: result.stderr.isNotEmpty
+            ? result.stderr
+            : 'Administrator authentication failed.',
+        platform: platform,
+        requiresElevation: true,
+        executedCommand: result.executedCommand,
+        metadata: {
+          'commands': commands.join('; '),
+          'shellCommand': result.shellCommand,
+          if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+          if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+          'exitCode': '${result.exitCode}',
+          'outcome': 'AuthFailed',
+        },
+      );
+    }
+
+    if (!result.isSuccess) {
+      return FixResult.failure(
+        kind,
+        message: 'Couldn’t update network settings.',
+        error: result.stderr.isNotEmpty
             ? result.stderr
             : (result.stdout.isNotEmpty
                 ? result.stdout
-                : 'exit code ${result.exitCode}');
-        final permission = detail.toLowerCase().contains('permission') ||
-            detail.toLowerCase().contains('not permitted');
-        return FixResult.failure(
-          kind,
-          message: permission
-              ? 'Admin access is required.'
-              : 'Couldn’t update network settings.',
-          error: detail,
-          platform: platform,
-          requiresElevation: true,
-          metadata: {
-            'commands': commands.join('; '),
-            'exitCode': '${result.exitCode}',
-            if (stdoutParts.isNotEmpty) 'stdout': stdoutParts.join('\n'),
-            if (stderrParts.isNotEmpty) 'stderr': stderrParts.join('\n'),
-          },
-        );
-      }
+                : 'exit code ${result.exitCode}'),
+        platform: platform,
+        requiresElevation: true,
+        executedCommand: result.executedCommand,
+        metadata: {
+          'commands': commands.join('; '),
+          'shellCommand': result.shellCommand,
+          'exitCode': '${result.exitCode}',
+          if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+          if (result.stderr.isNotEmpty) 'stderr': result.stderr,
+        },
+      );
     }
 
     return FixResult.success(
@@ -119,10 +149,13 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
       message: successMessage,
       platform: platform,
       requiresElevation: true,
+      executedCommand: result.executedCommand,
       metadata: {
         'commands': commands.join('; '),
-        if (stdoutParts.isNotEmpty) 'stdout': stdoutParts.join('\n'),
-        if (stderrParts.isNotEmpty) 'stderr': stderrParts.join('\n'),
+        'shellCommand': result.shellCommand,
+        'elevated': 'true',
+        if (result.stdout.isNotEmpty) 'stdout': result.stdout,
+        if (result.stderr.isNotEmpty) 'stderr': result.stderr,
       },
     );
   }

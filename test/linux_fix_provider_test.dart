@@ -6,7 +6,7 @@ import 'package:route_fix/domain/autofix/autofix.dart';
 
 void main() {
   group('LinuxFixProvider', () {
-    test('prefer IPv4 succeeds when both sysctl writes succeed', () async {
+    test('prefer IPv4 succeeds when pkexec sysctl writes succeed', () async {
       final commands = <List<String>>[];
       final provider = LinuxFixProvider(
         runProcess: (executable, arguments) async {
@@ -21,10 +21,9 @@ void main() {
       expect(result.executed, isTrue);
       expect(result.message, contains('Prefer IPv4'));
       expect(result.error, isNull);
-      expect(commands, [
-        ['sysctl', '-w', 'net.ipv6.conf.all.disable_ipv6=1'],
-        ['sysctl', '-w', 'net.ipv6.conf.default.disable_ipv6=1'],
-      ]);
+      expect(commands.single.first, 'pkexec');
+      expect(commands.single.last, contains('sysctl -w net.ipv6.conf.all.disable_ipv6=1'));
+      expect(commands.single.last, contains('sysctl -w net.ipv6.conf.default.disable_ipv6=1'));
     });
 
     test('restore default re-enables IPv6', () async {
@@ -39,20 +38,36 @@ void main() {
       final result = await provider.apply(FixActionKind.enableIpv6);
       expect(result.success, isTrue);
       expect(result.message, contains('restored'));
-      expect(commands, [
-        ['sysctl', '-w', 'net.ipv6.conf.all.disable_ipv6=0'],
-        ['sysctl', '-w', 'net.ipv6.conf.default.disable_ipv6=0'],
-      ]);
+      expect(commands.single.first, 'pkexec');
+      expect(commands.single.last, contains('sysctl -w net.ipv6.conf.all.disable_ipv6=0'));
     });
 
-    test('returns failure when sysctl exits non-zero', () async {
+    test('returns UserCancelled when pkexec dialog is dismissed', () async {
       final provider = LinuxFixProvider(
         runProcess: (executable, arguments) async {
           return ProcessResult(
             1,
-            1,
+            127,
             '',
-            'sysctl: permission denied',
+            'Error dismisses authentication dialog',
+          );
+        },
+      );
+
+      final result = await provider.apply(FixActionKind.disableIpv6);
+      expect(result.wasCancelled, isTrue);
+      expect(result.success, isFalse);
+      expect(result.executed, isFalse);
+    });
+
+    test('returns failure when pkexec auth fails', () async {
+      final provider = LinuxFixProvider(
+        runProcess: (executable, arguments) async {
+          return ProcessResult(
+            1,
+            126,
+            '',
+            'Not authorized',
           );
         },
       );
@@ -62,7 +77,7 @@ void main() {
       expect(result.success, isFalse);
       expect(result.executed, isTrue);
       expect(result.message, contains('Admin access'));
-      expect(result.error, contains('permission denied'));
+      expect(result.error, contains('Not authorized'));
     });
 
     test('returns failure when the process cannot be started', () async {
