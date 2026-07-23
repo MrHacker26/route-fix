@@ -20,11 +20,6 @@ final class AppSettingsController extends ChangeNotifier {
   bool get isLoaded => _loaded;
   bool get isSaving => _saving;
 
-  ThemeMode get themeMode => switch (_settings.appearance) {
-        AppAppearance.dark => ThemeMode.dark,
-        AppAppearance.system => ThemeMode.system,
-      };
-
   Future<void> load() async {
     final result = await _repository.getSettings();
     _settings = switch (result) {
@@ -43,10 +38,6 @@ final class AppSettingsController extends ChangeNotifier {
     await _repository.saveSettings(_settings);
     _saving = false;
     notifyListeners();
-  }
-
-  Future<void> setAppearance(AppAppearance appearance) {
-    return update((current) => current.copyWith(appearance: appearance));
   }
 
   Future<void> setDiagnosticsTimeoutSeconds(int seconds) {

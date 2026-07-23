@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../../core/app_info.dart';
 import '../../design_system/design_system.dart';
-import '../../domain/repositories/settings_repository.dart';
 import '../about/about_dialog.dart';
 import 'app_settings_controller.dart';
 
@@ -62,31 +61,7 @@ class SettingsPage extends StatelessWidget {
                                       children: [
                                         _Section(
                                           title: 'Appearance',
-                                          child: Column(
-                                            children: [
-                                              for (final option
-                                                  in AppAppearance.values)
-                                                _RadioRow(
-                                                  label: switch (option) {
-                                                    AppAppearance.dark =>
-                                                      'Dark',
-                                                    AppAppearance.system =>
-                                                      'System',
-                                                  },
-                                                  subtitle: switch (option) {
-                                                    AppAppearance.dark =>
-                                                      'Always use the dark interface.',
-                                                    AppAppearance.system =>
-                                                      'Follow the system appearance.',
-                                                  },
-                                                  selected: settings
-                                                          .appearance ==
-                                                      option,
-                                                  onTap: () => controller
-                                                      .setAppearance(option),
-                                                ),
-                                            ],
-                                          ),
+                                          child: const _AppearanceNote(),
                                         ),
                                         const SizedBox(
                                           height: AppSpacing.sectionGap,
@@ -349,71 +324,43 @@ class _Section extends StatelessWidget {
   }
 }
 
-class _RadioRow extends StatelessWidget {
-  const _RadioRow({
-    required this.label,
-    required this.subtitle,
-    required this.selected,
-    required this.onTap,
-  });
-
-  final String label;
-  final String subtitle;
-  final bool selected;
-  final VoidCallback onTap;
+class _AppearanceNote extends StatelessWidget {
+  const _AppearanceNote();
 
   @override
   Widget build(BuildContext context) {
     final text = AppTypography.textTheme;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: AppRadius.smAll,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(
-              horizontal: AppSpacing.xs,
-              vertical: AppSpacing.xs,
-            ),
-            child: Row(
-              children: [
-                Icon(
-                  selected
-                      ? Icons.radio_button_checked_rounded
-                      : Icons.radio_button_off_rounded,
-                  size: AppSpacing.iconInline,
-                  color: selected
-                      ? AppColors.primary
-                      : AppColors.onSurfaceMuted,
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(
+          Icons.dark_mode_outlined,
+          size: AppSpacing.iconInline,
+          color: AppColors.onSurfaceMuted,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'Dark interface',
+                style: text.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(width: AppSpacing.sm),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        label,
-                        style: text.titleSmall?.copyWith(
-                          fontWeight:
-                              selected ? FontWeight.w600 : FontWeight.w500,
-                        ),
-                      ),
-                      Text(
-                        subtitle,
-                        style: text.bodySmall?.copyWith(
-                          color: AppColors.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
+              ),
+              const SizedBox(height: AppSpacing.xxs),
+              Text(
+                'RouteFix is designed with a dark UI. Light mode is not available yet.',
+                style: text.bodySmall?.copyWith(
+                  color: AppColors.onSurfaceVariant,
+                  height: 1.4,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
-      ),
+      ],
     );
   }
 }

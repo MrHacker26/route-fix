@@ -25,12 +25,10 @@ void main() {
     );
 
     await controller.load();
-    expect(controller.settings.appearance, AppAppearance.dark);
     expect(controller.settings.diagnosticsTimeoutSeconds, 8);
     expect(controller.settings.autoRerunAfterFixes, isTrue);
     expect(controller.settings.showTechnicalDetailsByDefault, isFalse);
 
-    await controller.setAppearance(AppAppearance.system);
     await controller.setDiagnosticsTimeoutSeconds(12);
     await controller.setAutoRerunAfterFixes(false);
     await controller.setShowTechnicalDetailsByDefault(true);
@@ -39,7 +37,6 @@ void main() {
       repository: JsonFileSettingsRepository(directory: tempDir),
     );
     await reloaded.load();
-    expect(reloaded.settings.appearance, AppAppearance.system);
     expect(reloaded.settings.diagnosticsTimeoutSeconds, 12);
     expect(reloaded.settings.autoRerunAfterFixes, isFalse);
     expect(reloaded.settings.showTechnicalDetailsByDefault, isTrue);

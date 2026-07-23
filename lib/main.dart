@@ -83,7 +83,7 @@ class _RouteFixRootState extends State<_RouteFixRoot> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.dark,
       darkTheme: AppTheme.dark,
-      themeMode: widget.settings.themeMode,
+      themeMode: ThemeMode.dark,
       home: kNetworkingLayerDebug
           ? const NetworkingDebugPage(host: 'github.com')
           : _showOnboarding
