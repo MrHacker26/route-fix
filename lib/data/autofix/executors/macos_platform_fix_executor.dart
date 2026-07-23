@@ -8,8 +8,8 @@ import 'macos_privileged_networksetup.dart';
 
 /// macOS Auto Fix executor using privileged `networksetup` via AppleScript.
 ///
-/// Prefer IPv4 → `networksetup -setv6off <service>`
-/// Restore → `networksetup -setv6automatic <service>`
+/// Prefer IPv4 → `networksetup -setv6off <service>` on each enabled service
+/// Restore → `networksetup -setv6automatic <service>` on each enabled service
 ///
 /// Mutations are elevated with:
 /// `do shell script "…" with administrator privileges`
@@ -179,14 +179,9 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
     );
   }
 
-  /// Active service when discoverable; otherwise all enabled services.
+  /// All enabled network services — keeps IPv6 settings consistent for probes.
   Future<List<String>> _resolveTargetServices(FixActionKind kind) async {
-    final all = await _listEnabledServices(kind);
-    if (all.isEmpty) return const [];
-
-    final active = await _detectActiveService(all);
-    if (active != null) return [active];
-    return all;
+    return _listEnabledServices(kind);
   }
 
   Future<List<String>> _listEnabledServices(FixActionKind kind) async {
@@ -201,60 +196,6 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
     }
     if (!result.isSuccess) return const [];
     return _parseNetworkServices(result.stdout);
-  }
-
-  Future<String?> _detectActiveService(List<String> services) async {
-    String? iface;
-    try {
-      final route = await _shell.run('route', const ['-n', 'get', 'default']);
-      if (route.isSuccess) {
-        for (final line in route.stdout.split('\n')) {
-          final trimmed = line.trim();
-          if (trimmed.startsWith('interface:')) {
-            iface = trimmed.substring('interface:'.length).trim();
-            break;
-          }
-        }
-      }
-    } on AutoFixException {
-      iface = null;
-    }
-    if (iface == null || iface.isEmpty) return null;
-
-    try {
-      final order = await _shell.run(
-        'networksetup',
-        const ['-listnetworkserviceorder'],
-      );
-      if (!order.isSuccess) return null;
-      return _matchServiceForInterface(order.stdout, iface, services);
-    } on AutoFixException {
-      return null;
-    }
-  }
-
-  /// Parses `networksetup -listnetworkserviceorder` against an interface.
-  static String? _matchServiceForInterface(
-    String stdout,
-    String iface,
-    List<String> enabled,
-  ) {
-    final normalizedIface = iface.toLowerCase();
-    String? pendingService;
-    for (final raw in stdout.split('\n')) {
-      final line = raw.trim();
-      if (line.isEmpty) continue;
-      final serviceMatch = RegExp(r'^\(\d+\)\s+(.+)$').firstMatch(line);
-      if (serviceMatch != null) {
-        pendingService = serviceMatch.group(1)!.trim();
-        continue;
-      }
-      if (pendingService != null &&
-          line.toLowerCase().contains('device: $normalizedIface')) {
-        if (enabled.contains(pendingService)) return pendingService;
-      }
-    }
-    return null;
   }
 
   static List<String> _parseNetworkServices(String stdout) {

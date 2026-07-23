@@ -49,7 +49,7 @@ void main() {
       expect(osascripts.single[2], contains('Thunderbolt Bridge'));
     });
 
-    test('prefers the active service when detectable', () async {
+    test('updates all enabled services when active service is detectable', () async {
       final commands = <List<String>>[];
       final provider = MacOsFixProvider(
         runProcess: (executable, arguments) async {
@@ -82,13 +82,13 @@ void main() {
 
       final result = await provider.apply(FixActionKind.disableIpv6);
       expect(result.success, isTrue);
-      expect(result.metadata['applied'], 'Wi-Fi');
+      expect(result.metadata['applied'], 'Wi-Fi, Ethernet');
       final scripts =
           commands.where((c) => c.first == 'osascript').map((c) => c[2]).toList();
       expect(scripts, hasLength(1));
       expect(scripts.single, contains('-setv6off'));
       expect(scripts.single, contains('Wi-Fi'));
-      expect(scripts.single, isNot(contains('Ethernet')));
+      expect(scripts.single, contains('Ethernet'));
     });
 
     test('enables IPv6 with privileged setv6automatic', () async {
