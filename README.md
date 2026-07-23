@@ -43,6 +43,8 @@
 **Releases:** [GitHub Releases](https://github.com/MrHacker26/route-fix/releases)  
 (`RouteFix-v*-macos.zip` / `windows.zip` / `linux.tar.gz`)
 
+**Step-by-step install** (Applications folder, shortcuts, app menu): [`docs/INSTALL.md`](docs/INSTALL.md)
+
 **From source:**
 
 ```bash

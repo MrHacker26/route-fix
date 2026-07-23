@@ -188,17 +188,15 @@ appimagetool "$APPDIR" dist/RouteFix-v1.0.0-x86_64.AppImage
 
 ## Installation (end users)
 
-### From GitHub Releases
+See **[`docs/INSTALL.md`](INSTALL.md)** for step-by-step install instructions on macOS, Windows, and Linux (Applications folder, Start menu shortcuts, app menu, uninstall).
 
-1. Open [Releases](https://github.com/MrHacker26/route-fix/releases).
-2. Download the asset for your OS.
-3. Install / run:
+Quick reference:
 
 | Platform | Steps |
 |----------|--------|
-| **macOS** | Unzip → open `RouteFix.app` (right-click → Open if Gatekeeper blocks) |
-| **Windows** | Unzip → run `route_fix.exe` (or run the `.exe` installer if provided) |
-| **Linux** | Extract tarball → run `./route_fix` from `bundle/`, **or** `chmod +x` the AppImage and run it |
+| **macOS** | Unzip → drag `RouteFix.app` to Applications |
+| **Windows** | Unzip → run `route_fix.exe` (portable; no installer in CI yet) |
+| **Linux** | Extract tarball → run `./route_fix` from `bundle/` |
 
 Admin password may be required for Prefer IPv4 / Restore Defaults.
 
