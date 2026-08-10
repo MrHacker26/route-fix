@@ -50,7 +50,10 @@ final class WindowsAdminRequirementResolver {
     final base = switch (kind) {
       FixActionKind.disableIpv6 || FixActionKind.enableIpv6 =>
         WindowsAdminRequirement.ipv6AdapterBinding,
-      FixActionKind.flushDns || FixActionKind.openWarp =>
+      FixActionKind.flushDns ||
+      FixActionKind.changeDnsCloudflare =>
+        WindowsAdminRequirement.ipv6AdapterBinding,
+      FixActionKind.openWarp =>
         const WindowsAdminRequirement(required: false),
     };
 

@@ -194,15 +194,21 @@ void main() {
       expect(result.error, contains('networksetup failed'));
     });
 
-    test('returns notImplemented for flushDns', () async {
+    test('flushDns runs privileged cache flush on macOS', () async {
+      final commands = <List<String>>[];
       final provider = MacOsFixProvider(
         runProcess: (executable, arguments) async {
-          fail('should not run');
+          commands.add([executable, ...arguments]);
+          if (executable == 'osascript') {
+            return ProcessResult(1, 0, '', '');
+          }
+          return ProcessResult(1, 1, '', 'unexpected');
         },
       );
       final result = await provider.apply(FixActionKind.flushDns);
-      expect(result.success, isFalse);
-      expect(result.executed, isFalse);
+      expect(result.success, isTrue);
+      expect(result.executed, isTrue);
+      expect(commands.where((c) => c.first == 'osascript'), isNotEmpty);
     });
   });
 }

@@ -279,6 +279,8 @@ final class DiagnosticsResultViewData {
         'Return to normal settings if IPv6 was switched off.',
       FixActionKind.flushDns =>
         'Clear outdated name lookups after network changes.',
+      FixActionKind.changeDnsCloudflare =>
+        'Use Cloudflare resolvers when name lookup fails.',
       FixActionKind.openWarp =>
         'Try WARP when public routes feel congested.',
     };
@@ -347,6 +349,12 @@ final class DiagnosticsResultViewData {
           'Python': 'Medium',
           'Docker': 'High',
           'AI APIs': 'Medium',
+        },
+      FixActionKind.changeDnsCloudflare => {
+          'Git': 'High',
+          'Python': 'High',
+          'Docker': 'Medium',
+          'AI APIs': 'High',
         },
       FixActionKind.openWarp => {
           'Git': 'Medium',
@@ -778,7 +786,9 @@ final class DiagnosticsResultViewData {
     return switch (kind) {
       FixActionKind.disableIpv6 || FixActionKind.enableIpv6 =>
         Icons.settings_ethernet_rounded,
-      FixActionKind.flushDns => Icons.dns_outlined,
+      FixActionKind.flushDns ||
+      FixActionKind.changeDnsCloudflare =>
+        Icons.dns_outlined,
       FixActionKind.openWarp => Icons.travel_explore_rounded,
     };
   }

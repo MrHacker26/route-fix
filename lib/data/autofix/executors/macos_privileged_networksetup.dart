@@ -42,6 +42,34 @@ final class MacOsPrivilegedNetworksetup {
 
   final ShellCommandExecutor _shell;
 
+  /// Runs a validated shell script behind administrator authentication.
+  Future<MacOsPrivilegedCommandResult> runPrivilegedShell(
+    String shellCommand,
+  ) async {
+    _validatePrivilegedShell(shellCommand);
+    if (shellCommand.trim().isEmpty) {
+      return const MacOsPrivilegedCommandResult(
+        outcome: MacOsPrivilegedOutcome.failed,
+        exitCode: 1,
+        stdout: '',
+        stderr: 'No shell command provided.',
+        executedCommand: 'osascript -e <privileged shell>',
+        shellCommand: '',
+      );
+    }
+
+    final appleScript =
+        'do shell script ${_appleScriptString(shellCommand)} with administrator privileges';
+    const executedCommand = 'osascript -e <privileged shell>';
+
+    final result = await _shell.run('osascript', ['-e', appleScript]);
+    return _mapResult(
+      result: result,
+      executedCommand: executedCommand,
+      shellCommand: shellCommand,
+    );
+  }
+
   /// Runs `networksetup <flag> <service>` for each service in one elevated script.
   Future<MacOsPrivilegedCommandResult> runForServices({
     required String flag,
@@ -173,6 +201,36 @@ final class MacOsPrivilegedNetworksetup {
   static void _validateFlag(String flag) {
     if (flag != '-setv6off' && flag != '-setv6automatic') {
       throw ArgumentError.value(flag, 'flag', 'Unsupported networksetup flag.');
+    }
+  }
+
+  static final _flushDnsSegment = RegExp(
+    r'^(/usr/bin/)?dscacheutil -flushcache$',
+  );
+
+  static final _setDnsSegment = RegExp(
+    r"^networksetup -setdnsservers '([^'\\]|\\.)+' "
+    r"((Empty)|"
+    r"((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3})( "
+    r"((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(\.(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)){3}))?)$",
+  );
+
+  static final _killMdnsSegment = RegExp(
+    r'^(/usr/bin/)?killall -HUP mDNSResponder$',
+  );
+
+  static void _validatePrivilegedShell(String shellCommand) {
+    for (final segment in shellCommand.split('&&')) {
+      final part = segment.trim();
+      if (part.isEmpty) continue;
+      if (_flushDnsSegment.hasMatch(part)) continue;
+      if (_killMdnsSegment.hasMatch(part)) continue;
+      if (_setDnsSegment.hasMatch(part)) continue;
+      throw ArgumentError.value(
+        shellCommand,
+        'shellCommand',
+        'Rejected unsafe privileged shell segment: $part',
+      );
     }
   }
 

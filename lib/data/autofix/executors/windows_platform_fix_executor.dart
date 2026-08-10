@@ -4,6 +4,7 @@ import '../../../domain/autofix/models/fix_result.dart';
 import '../../../domain/autofix/models/fix_type.dart';
 import '../../../domain/autofix/platform_fix_executor.dart';
 import '../../../domain/autofix/shell_command_executor.dart';
+import 'windows_dns_fix_operations.dart';
 import 'windows_privileged_powershell.dart';
 
 /// Windows Auto Fix executor using elevated PowerShell NetAdapterBinding.
@@ -13,9 +14,14 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
   WindowsPlatformFixExecutor({
     required ShellCommandExecutor shell,
     WindowsPrivilegedPowerShell? privileged,
-  }) : _privileged = privileged ?? WindowsPrivilegedPowerShell(shell: shell);
+    WindowsDnsFixOperations? dns,
+  })  : _shell = shell,
+        _privileged = privileged ?? WindowsPrivilegedPowerShell(shell: shell),
+        _dns = dns ?? WindowsDnsFixOperations(shell: shell, privileged: privileged);
 
+  final ShellCommandExecutor _shell;
   final WindowsPrivilegedPowerShell _privileged;
+  final WindowsDnsFixOperations _dns;
 
   static const _componentId = 'ms_tcpip6';
 
@@ -30,13 +36,23 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
 
   @override
   bool supports(FixType type) =>
-      type == FixType.preferIpv4 || type == FixType.restoreDefault;
+      type == FixType.preferIpv4 ||
+      type == FixType.restoreDefault ||
+      type == FixType.flushDnsCache ||
+      type == FixType.changeDnsCloudflare ||
+      type == FixType.restoreDns;
 
   @override
-  Future<FixResult> apply(FixType type) async {
+  Future<FixResult> apply(
+    FixType type, {
+    Map<String, String>? context,
+  }) async {
     return switch (type) {
       FixType.preferIpv4 => _setIpv6Binding(enabled: false),
       FixType.restoreDefault => _setIpv6Binding(enabled: true),
+      FixType.flushDnsCache => _dns.flushDns(platform),
+      FixType.changeDnsCloudflare => _dns.applyCloudflare(platform),
+      FixType.restoreDns => _dns.restoreDns(platform, context),
       _ => FixResult.notImplemented(
           type.toFixActionKind ?? FixActionKind.disableIpv6,
         ),

@@ -29,5 +29,10 @@ abstract interface class PlatformFixExecutor {
   bool supports(FixType type);
 
   /// Apply [type]. Must not invent success without real execution evidence.
-  Future<FixResult> apply(FixType type);
+  ///
+  /// [context] carries restore payloads (e.g. [DnsBackupCodec.metadataKey]).
+  Future<FixResult> apply(
+    FixType type, {
+    Map<String, String>? context,
+  });
 }

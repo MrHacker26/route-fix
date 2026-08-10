@@ -40,7 +40,20 @@ abstract base class PlatformFixProvider implements FixProvider {
       kind: FixActionKind.flushDns,
       title: 'Flush DNS',
       description: 'Clear cached name lookups after network changes.',
-      availability: FixAvailability.comingSoon,
+      availability: FixAvailability.available,
+      supportedPlatforms: {
+        FixPlatform.linux,
+        FixPlatform.macOS,
+        FixPlatform.windows,
+      },
+      relatedIssueCodes: ['dns_failure'],
+    ),
+    FixAction(
+      kind: FixActionKind.changeDnsCloudflare,
+      title: 'Use Cloudflare DNS',
+      description:
+          'Use 1.1.1.1 and 1.0.0.1 when name lookup fails on your network.',
+      availability: FixAvailability.available,
       supportedPlatforms: {
         FixPlatform.linux,
         FixPlatform.macOS,

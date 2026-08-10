@@ -112,7 +112,10 @@ final class _SlowExecutor implements PlatformFixExecutor {
   bool supports(FixType type) => true;
 
   @override
-  Future<FixResult> apply(FixType type) async {
+  Future<FixResult> apply(
+    FixType type, {
+    Map<String, String>? context,
+  }) async {
     started.complete();
     await release.future;
     return FixResult.success(

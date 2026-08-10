@@ -4,6 +4,7 @@ import '../../../domain/autofix/models/fix_result.dart';
 import '../../../domain/autofix/models/fix_type.dart';
 import '../../../domain/autofix/platform_fix_executor.dart';
 import '../../../domain/autofix/shell_command_executor.dart';
+import 'linux_dns_fix_operations.dart';
 import 'linux_privileged_sysctl.dart';
 
 /// Linux Auto Fix executor using privileged `sysctl` via `pkexec`.
@@ -11,9 +12,14 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
   LinuxPlatformFixExecutor({
     required ShellCommandExecutor shell,
     LinuxPrivilegedSysctl? privileged,
-  }) : _privileged = privileged ?? LinuxPrivilegedSysctl(shell: shell);
+    LinuxDnsFixOperations? dns,
+  })  : _shell = shell,
+        _privileged = privileged ?? LinuxPrivilegedSysctl(shell: shell),
+        _dns = dns ?? LinuxDnsFixOperations(shell: shell);
 
+  final ShellCommandExecutor _shell;
   final LinuxPrivilegedSysctl _privileged;
+  final LinuxDnsFixOperations _dns;
 
   static const _preferSettings = <String>[
     'net.ipv6.conf.all.disable_ipv6=1',
@@ -30,10 +36,17 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
 
   @override
   bool supports(FixType type) =>
-      type == FixType.preferIpv4 || type == FixType.restoreDefault;
+      type == FixType.preferIpv4 ||
+      type == FixType.restoreDefault ||
+      type == FixType.flushDnsCache ||
+      type == FixType.changeDnsCloudflare ||
+      type == FixType.restoreDns;
 
   @override
-  Future<FixResult> apply(FixType type) async {
+  Future<FixResult> apply(
+    FixType type, {
+    Map<String, String>? context,
+  }) async {
     return switch (type) {
       FixType.preferIpv4 => _applySysctl(
           kind: FixActionKind.disableIpv6,
@@ -45,6 +58,9 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
           settings: _restoreSettings,
           successMessage: 'Defaults restored.',
         ),
+      FixType.flushDnsCache => _dns.flushDns(platform),
+      FixType.changeDnsCloudflare => _dns.applyCloudflare(platform),
+      FixType.restoreDns => _dns.restoreDns(platform, context),
       _ => FixResult.notImplemented(
           type.toFixActionKind ?? FixActionKind.disableIpv6,
         ),

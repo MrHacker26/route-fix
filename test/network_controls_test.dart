@@ -6,11 +6,59 @@ import 'package:route_fix/domain/autofix/models/fix_result.dart';
 import 'package:route_fix/domain/autofix/models/fix_type.dart';
 import 'package:route_fix/domain/autofix/platform_fix_executor.dart';
 import 'package:route_fix/domain/autofix/shell_command_executor.dart';
+import 'package:route_fix/features/network_controls/dns_preference.dart';
+import 'package:route_fix/features/network_controls/dns_preference_probe.dart';
 import 'package:route_fix/features/network_controls/ipv6_preference.dart';
 import 'package:route_fix/features/network_controls/ipv6_preference_probe.dart';
 import 'package:route_fix/features/network_controls/network_controls_controller.dart';
 
 void main() {
+  Map<String, ShellCommandResult> linuxProbeResponses({String ipv6Disabled = '0'}) {
+    return {
+      'sysctl|-n|net.ipv6.conf.all.disable_ipv6': ShellCommandResult(
+        executable: 'sysctl',
+        arguments: const ['-n', 'net.ipv6.conf.all.disable_ipv6'],
+        exitCode: 0,
+        stdout: ipv6Disabled,
+        stderr: '',
+      ),
+      'ip|-4|route|show|default': const ShellCommandResult(
+        executable: 'ip',
+        arguments: ['-4', 'route', 'show', 'default'],
+        exitCode: 0,
+        stdout: 'default via 192.168.1.1 dev wlan0 proto dhcp\n',
+        stderr: '',
+      ),
+      'resolvectl|dns|wlan0': const ShellCommandResult(
+        executable: 'resolvectl',
+        arguments: ['dns', 'wlan0'],
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+      ),
+    };
+  }
+
+  NetworkControlsController linuxController(
+    _FakeAutoFix autoFix, {
+    String ipv6Disabled = '0',
+    Future<Ipv6Preference?> Function()? readSavedIpv6Selection,
+    Future<void> Function(Ipv6Preference preference)? saveIpv6Selection,
+  }) {
+    final shell = _FakeShell(linuxProbeResponses(ipv6Disabled: ipv6Disabled));
+    return NetworkControlsController(
+      autoFix: autoFix,
+      probe: Ipv6PreferenceProbe(
+        shell: shell,
+        autoFix: autoFix,
+        platformOverride: FixPlatform.linux,
+      ),
+      dnsProbe: DnsPreferenceProbe(shell: shell, autoFix: autoFix),
+      readSavedIpv6Selection: readSavedIpv6Selection,
+      saveIpv6Selection: saveIpv6Selection,
+    );
+  }
+
   group('Ipv6PreferenceProbe', () {
     test('detects Automatic on macOS from getinfo', () async {
       final autoFix = _FakeAutoFix();
@@ -81,22 +129,7 @@ void main() {
   group('NetworkControlsController', () {
     test('pre-selects detected state on first open', () async {
       final autoFix = _FakeAutoFix();
-      final controller = NetworkControlsController(
-        autoFix: autoFix,
-        probe: Ipv6PreferenceProbe(
-          shell: _FakeShell({
-            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
-              executable: 'sysctl',
-              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
-              exitCode: 0,
-              stdout: '0',
-              stderr: '',
-            ),
-          }),
-          autoFix: autoFix,
-          platformOverride: FixPlatform.linux,
-        ),
-      );
+      final controller = linuxController(autoFix);
 
       await controller.load();
       expect(controller.detected, Ipv6Preference.automatic);
@@ -106,22 +139,7 @@ void main() {
 
     test('Apply Changes stays disabled until selection changes', () async {
       final autoFix = _FakeAutoFix();
-      final controller = NetworkControlsController(
-        autoFix: autoFix,
-        probe: Ipv6PreferenceProbe(
-          shell: _FakeShell({
-            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
-              executable: 'sysctl',
-              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
-              exitCode: 0,
-              stdout: '0',
-              stderr: '',
-            ),
-          }),
-          autoFix: autoFix,
-          platformOverride: FixPlatform.linux,
-        ),
-      );
+      final controller = linuxController(autoFix);
 
       await controller.load();
       expect(controller.detected, Ipv6Preference.automatic);
@@ -135,22 +153,9 @@ void main() {
 
     test('restores saved selection on load', () async {
       final autoFix = _FakeAutoFix();
-      final controller = NetworkControlsController(
-        autoFix: autoFix,
-        probe: Ipv6PreferenceProbe(
-          shell: _FakeShell({
-            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
-              executable: 'sysctl',
-              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
-              exitCode: 0,
-              stdout: '0',
-              stderr: '',
-            ),
-          }),
-          autoFix: autoFix,
-          platformOverride: FixPlatform.linux,
-        ),
-        readSavedSelection: () async => Ipv6Preference.preferIpv4,
+      final controller = linuxController(
+        autoFix,
+        readSavedIpv6Selection: () async => Ipv6Preference.preferIpv4,
       );
 
       await controller.load();
@@ -162,22 +167,9 @@ void main() {
     test('Prefer IPv4 applies via AutoFixService.preferIpv4', () async {
       Ipv6Preference? saved;
       final autoFix = _FakeAutoFix();
-      final controller = NetworkControlsController(
-        autoFix: autoFix,
-        probe: Ipv6PreferenceProbe(
-          shell: _FakeShell({
-            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
-              executable: 'sysctl',
-              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
-              exitCode: 0,
-              stdout: '0',
-              stderr: '',
-            ),
-          }),
-          autoFix: autoFix,
-          platformOverride: FixPlatform.linux,
-        ),
-        saveSelection: (preference) async {
+      final controller = linuxController(
+        autoFix,
+        saveIpv6Selection: (preference) async {
           saved = preference;
         },
       );
@@ -195,22 +187,7 @@ void main() {
 
     test('maps detected IPv6 off to Prefer IPv4 selection', () async {
       final autoFix = _FakeAutoFix();
-      final controller = NetworkControlsController(
-        autoFix: autoFix,
-        probe: Ipv6PreferenceProbe(
-          shell: _FakeShell({
-            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
-              executable: 'sysctl',
-              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
-              exitCode: 0,
-              stdout: '1',
-              stderr: '',
-            ),
-          }),
-          autoFix: autoFix,
-          platformOverride: FixPlatform.linux,
-        ),
-      );
+      final controller = linuxController(autoFix, ipv6Disabled: '1');
 
       await controller.load();
       expect(controller.detected, Ipv6Preference.disableIpv6);
@@ -220,22 +197,7 @@ void main() {
 
     test('Restore Defaults uses AutoFixService.restoreDefault', () async {
       final autoFix = _FakeAutoFix();
-      final controller = NetworkControlsController(
-        autoFix: autoFix,
-        probe: Ipv6PreferenceProbe(
-          shell: _FakeShell({
-            'sysctl|-n|net.ipv6.conf.all.disable_ipv6': const ShellCommandResult(
-              executable: 'sysctl',
-              arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
-              exitCode: 0,
-              stdout: '1',
-              stderr: '',
-            ),
-          }),
-          autoFix: autoFix,
-          platformOverride: FixPlatform.linux,
-        ),
-      );
+      final controller = linuxController(autoFix, ipv6Disabled: '1');
 
       await controller.load();
       expect(controller.detected, Ipv6Preference.disableIpv6);
@@ -309,12 +271,17 @@ final class _FakeAutoFix implements AutoFixService {
 
   @override
   bool supports(FixType type) =>
-      type == FixType.preferIpv4 || type == FixType.restoreDefault;
+      type == FixType.preferIpv4 ||
+      type == FixType.restoreDefault ||
+      type == FixType.flushDnsCache ||
+      type == FixType.changeDnsCloudflare ||
+      type == FixType.restoreDns;
 
   @override
   Future<FixResult> apply(
     FixType type, {
     void Function(AutoFixPhase phase)? onPhase,
+    Map<String, String>? context,
   }) async {
     applyCalls.add(type);
     if (type == FixType.preferIpv4) {

@@ -16,6 +16,7 @@ class AppSettings {
     this.showTechnicalDetailsByDefault = false,
     this.preferredDnsHint,
     this.networkControlsIpv6Preference,
+    this.networkControlsDnsPreference,
   });
 
   final bool hasCompletedOnboarding;
@@ -32,6 +33,9 @@ class AppSettings {
   /// Last IPv6 preference chosen in Network Controls ([Ipv6Preference.name]).
   final String? networkControlsIpv6Preference;
 
+  /// Last DNS preference chosen in Network Controls ([DnsPreference.name]).
+  final String? networkControlsDnsPreference;
+
   Duration get diagnosticsTimeout =>
       Duration(seconds: diagnosticsTimeoutSeconds.clamp(5, 30));
 
@@ -42,6 +46,7 @@ class AppSettings {
     bool? showTechnicalDetailsByDefault,
     String? preferredDnsHint,
     String? networkControlsIpv6Preference,
+    String? networkControlsDnsPreference,
   }) {
     return AppSettings(
       hasCompletedOnboarding:
@@ -54,6 +59,8 @@ class AppSettings {
       preferredDnsHint: preferredDnsHint ?? this.preferredDnsHint,
       networkControlsIpv6Preference:
           networkControlsIpv6Preference ?? this.networkControlsIpv6Preference,
+      networkControlsDnsPreference:
+          networkControlsDnsPreference ?? this.networkControlsDnsPreference,
     );
   }
 
@@ -65,6 +72,8 @@ class AppSettings {
         if (preferredDnsHint != null) 'preferredDnsHint': preferredDnsHint,
         if (networkControlsIpv6Preference != null)
           'networkControlsIpv6Preference': networkControlsIpv6Preference,
+        if (networkControlsDnsPreference != null)
+          'networkControlsDnsPreference': networkControlsDnsPreference,
       };
 
   factory AppSettings.fromJson(Map<String, dynamic> json) {
@@ -78,6 +87,8 @@ class AppSettings {
       preferredDnsHint: json['preferredDnsHint'] as String?,
       networkControlsIpv6Preference:
           json['networkControlsIpv6Preference'] as String?,
+      networkControlsDnsPreference:
+          json['networkControlsDnsPreference'] as String?,
     );
   }
 }

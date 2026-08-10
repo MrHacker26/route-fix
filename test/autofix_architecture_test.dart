@@ -7,7 +7,7 @@ void main() {
   group('PlatformFixProvider catalog', () {
     final provider = MacOsFixProvider();
 
-    test('exposes disable/enable IPv6 and future flush/warp actions', () {
+    test('exposes disable/enable IPv6 and DNS actions', () {
       final actions = provider.availableActions();
       final kinds = actions.map((a) => a.kind).toSet();
 
@@ -17,12 +17,13 @@ void main() {
           FixActionKind.disableIpv6,
           FixActionKind.enableIpv6,
           FixActionKind.flushDns,
+          FixActionKind.changeDnsCloudflare,
           FixActionKind.openWarp,
         ]),
       );
 
       final flush = actions.firstWhere((a) => a.kind == FixActionKind.flushDns);
-      expect(flush.availability, FixAvailability.comingSoon);
+      expect(flush.availability, FixAvailability.available);
 
       final disable =
           actions.firstWhere((a) => a.kind == FixActionKind.disableIpv6);

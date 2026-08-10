@@ -43,6 +43,7 @@ final class DefaultAutoFixService implements AutoFixService {
   Future<FixResult> apply(
     FixType type, {
     void Function(AutoFixPhase phase)? onPhase,
+    Map<String, String>? context,
   }) async {
     if (_busy) {
       final kind = type.toFixActionKind ?? FixActionKind.disableIpv6;
@@ -75,10 +76,23 @@ final class DefaultAutoFixService implements AutoFixService {
       await Future<void>.delayed(const Duration(milliseconds: 60));
       await _emit(AutoFixPhase.restartingInterface, onPhase);
 
-      final result = await _executor.apply(type);
+      final result = await _executor.apply(type, context: context);
 
       if (result.success && result.executed) {
         await _emit(AutoFixPhase.verifying, onPhase);
+        if (type == FixType.flushDnsCache) {
+          return result;
+        }
+        if (type == FixType.restoreDns) {
+          _cache.removeWhere((item) => item.type == FixType.changeDnsCloudflare);
+          final persisted = await _repository.listApplied();
+          for (final fix in persisted) {
+            if (fix.type == FixType.changeDnsCloudflare) {
+              await _repository.remove(fix.id);
+            }
+          }
+          return result;
+        }
         final recorded = AppliedFix(
           id: '${type.name}-${DateTime.now().millisecondsSinceEpoch}',
           type: type,
@@ -141,6 +155,15 @@ final class DefaultAutoFixService implements AutoFixService {
     try {
       await _emit(AutoFixPhase.restoring, onPhase);
       await _emit(AutoFixPhase.updatingNetwork, onPhase);
+
+      for (final fix in List<AppliedFix>.from(_cache)) {
+        if (fix.type == FixType.changeDnsCloudflare) {
+          await _executor.apply(
+            FixType.restoreDns,
+            context: fix.metadata,
+          );
+        }
+      }
 
       if (!_executor.supports(FixType.restoreDefault)) {
         return FixResult.failure(

@@ -252,6 +252,7 @@ final class _FakeAutoFixService implements AutoFixService {
   Future<FixResult> apply(
     FixType type, {
     void Function(AutoFixPhase phase)? onPhase,
+    Map<String, String>? context,
   }) async {
     applyCalls.add(type);
     onPhase?.call(AutoFixPhase.applying);

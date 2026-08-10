@@ -65,4 +65,12 @@ final class AppSettingsController extends ChangeNotifier {
       ),
     );
   }
+
+  Future<void> setNetworkControlsDnsPreference(String preferenceName) {
+    return update(
+      (current) => current.copyWith(
+        networkControlsDnsPreference: preferenceName,
+      ),
+    );
+  }
 }

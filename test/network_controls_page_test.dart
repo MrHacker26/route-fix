@@ -8,6 +8,7 @@ import 'package:route_fix/domain/autofix/models/fix_result.dart';
 import 'package:route_fix/domain/autofix/models/fix_type.dart';
 import 'package:route_fix/domain/autofix/platform_fix_executor.dart';
 import 'package:route_fix/domain/autofix/shell_command_executor.dart';
+import 'package:route_fix/features/network_controls/dns_preference_probe.dart';
 import 'package:route_fix/features/network_controls/ipv6_preference_probe.dart';
 import 'package:route_fix/features/network_controls/network_controls_controller.dart';
 import 'package:route_fix/features/network_controls/network_controls_page.dart';
@@ -17,21 +18,37 @@ void main() {
     tester,
   ) async {
     final autoFix = _FakeAutoFix();
+    final shell = _StaticShell(
+      const ShellCommandResult(
+        executable: 'sysctl',
+        arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
+        exitCode: 0,
+        stdout: '0',
+        stderr: '',
+      ),
+      const ShellCommandResult(
+        executable: 'ip',
+        arguments: ['-4', 'route', 'show', 'default'],
+        exitCode: 0,
+        stdout: 'default via 192.168.1.1 dev wlan0 proto dhcp\n',
+        stderr: '',
+      ),
+      const ShellCommandResult(
+        executable: 'resolvectl',
+        arguments: ['dns', 'wlan0'],
+        exitCode: 0,
+        stdout: '',
+        stderr: '',
+      ),
+    );
     final controller = NetworkControlsController(
       autoFix: autoFix,
       probe: Ipv6PreferenceProbe(
-        shell: _StaticShell(
-          const ShellCommandResult(
-            executable: 'sysctl',
-            arguments: ['-n', 'net.ipv6.conf.all.disable_ipv6'],
-            exitCode: 0,
-            stdout: '0',
-            stderr: '',
-          ),
-        ),
+        shell: shell,
         autoFix: autoFix,
         platformOverride: FixPlatform.linux,
       ),
+      dnsProbe: DnsPreferenceProbe(shell: shell, autoFix: autoFix),
     );
 
     await tester.pumpWidget(
@@ -73,17 +90,27 @@ void main() {
 }
 
 final class _StaticShell implements ShellCommandExecutor {
-  _StaticShell(this.result);
+  _StaticShell(this.primary, [this.secondary, this.tertiary]);
 
-  final ShellCommandResult result;
+  final ShellCommandResult primary;
+  final ShellCommandResult? secondary;
+  final ShellCommandResult? tertiary;
 
   @override
   Future<ShellCommandResult> run(
     String executable,
     List<String> arguments, {
     Duration? timeout,
-  }) async =>
-      result;
+  }) async {
+    final key = [executable, ...arguments].join('|');
+    if (key == 'ip|-4|route|show|default' && secondary != null) {
+      return secondary!;
+    }
+    if (key == 'resolvectl|dns|wlan0' && tertiary != null) {
+      return tertiary!;
+    }
+    return primary;
+  }
 }
 
 final class _FakeAutoFix implements AutoFixService {
@@ -106,6 +133,7 @@ final class _FakeAutoFix implements AutoFixService {
   Future<FixResult> apply(
     FixType type, {
     void Function(AutoFixPhase phase)? onPhase,
+    Map<String, String>? context,
   }) async {
     return FixResult.success(
       FixActionKind.disableIpv6,

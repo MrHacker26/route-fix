@@ -4,6 +4,7 @@ import '../../../domain/autofix/models/fix_result.dart';
 import '../../../domain/autofix/models/fix_type.dart';
 import '../../../domain/autofix/platform_fix_executor.dart';
 import '../../../domain/autofix/shell_command_executor.dart';
+import 'macos_dns_fix_operations.dart';
 import 'macos_privileged_networksetup.dart';
 
 /// macOS Auto Fix executor using privileged `networksetup` via AppleScript.
@@ -17,24 +18,44 @@ final class MacOsPlatformFixExecutor implements PlatformFixExecutor {
   MacOsPlatformFixExecutor({
     required ShellCommandExecutor shell,
     MacOsPrivilegedNetworksetup? privileged,
+    MacOsDnsFixOperations? dns,
   })  : _shell = shell,
-        _privileged = privileged ?? MacOsPrivilegedNetworksetup(shell: shell);
+        _privileged = privileged ?? MacOsPrivilegedNetworksetup(shell: shell),
+        _dns = dns ?? MacOsDnsFixOperations(shell: shell, privileged: privileged);
 
   final ShellCommandExecutor _shell;
   final MacOsPrivilegedNetworksetup _privileged;
+  final MacOsDnsFixOperations _dns;
 
   @override
   FixPlatform get platform => FixPlatform.macOS;
 
   @override
   bool supports(FixType type) =>
-      type == FixType.preferIpv4 || type == FixType.restoreDefault;
+      type == FixType.preferIpv4 ||
+      type == FixType.restoreDefault ||
+      type == FixType.flushDnsCache ||
+      type == FixType.changeDnsCloudflare ||
+      type == FixType.restoreDns;
 
   @override
-  Future<FixResult> apply(FixType type) async {
+  Future<FixResult> apply(
+    FixType type, {
+    Map<String, String>? context,
+  }) async {
     return switch (type) {
       FixType.preferIpv4 => _setIpv6(enabled: false),
       FixType.restoreDefault => _setIpv6(enabled: true),
+      FixType.flushDnsCache => _dns.flushDns(platform),
+      FixType.changeDnsCloudflare => _dns.applyCloudflare(
+          platform,
+          () => _listEnabledServices(FixActionKind.changeDnsCloudflare),
+        ),
+      FixType.restoreDns => _dns.restoreDns(
+          platform,
+          context,
+          () => _listEnabledServices(FixActionKind.changeDnsCloudflare),
+        ),
       _ => FixResult.notImplemented(
           type.toFixActionKind ?? FixActionKind.disableIpv6,
         ),

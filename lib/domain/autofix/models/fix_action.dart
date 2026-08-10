@@ -6,8 +6,11 @@ enum FixActionKind {
   /// Re-enable IPv6 if previously disabled.
   enableIpv6,
 
-  /// Clear local DNS caches. Reserved for a future release.
+  /// Clear local DNS caches.
   flushDns,
+
+  /// Use Cloudflare public resolvers (1.1.1.1 / 1.0.0.1).
+  changeDnsCloudflare,
 
   /// Launch Cloudflare WARP. Reserved for a future release.
   openWarp,

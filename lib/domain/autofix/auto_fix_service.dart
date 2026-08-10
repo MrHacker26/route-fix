@@ -19,6 +19,7 @@ abstract interface class AutoFixService {
   Future<FixResult> apply(
     FixType type, {
     void Function(AutoFixPhase phase)? onPhase,
+    Map<String, String>? context,
   });
 
   /// Restores default network configuration for applied fixes.

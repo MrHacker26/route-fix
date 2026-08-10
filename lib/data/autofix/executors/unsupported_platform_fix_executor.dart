@@ -14,7 +14,10 @@ final class UnsupportedPlatformFixExecutor implements PlatformFixExecutor {
   bool supports(FixType type) => false;
 
   @override
-  Future<FixResult> apply(FixType type) async {
+  Future<FixResult> apply(
+    FixType type, {
+    Map<String, String>? context,
+  }) async {
     final kind = type.toFixActionKind ?? FixActionKind.disableIpv6;
     return FixResult.failure(
       kind,

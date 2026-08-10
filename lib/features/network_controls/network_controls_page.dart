@@ -9,6 +9,8 @@ import '../../domain/autofix/platform_fix_executor.dart';
 import '../diagnostics/diagnostics_page.dart';
 import '../diagnostics/human_message.dart';
 import 'apply_network_changes_dialog.dart';
+import 'dns_preference.dart';
+import 'dns_preference_probe.dart';
 import 'ipv6_preference.dart';
 import 'ipv6_preference_probe.dart';
 import 'network_controls_controller.dart';
@@ -48,13 +50,27 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
             shell: const DartIoShellCommandExecutor(),
             autoFix: autoFix,
           ),
-          readSavedSelection: () async {
+          dnsProbe: DnsPreferenceProbe(
+            shell: const DartIoShellCommandExecutor(),
+            autoFix: autoFix,
+          ),
+          readSavedIpv6Selection: () async {
             return parseStoredIpv6Preference(
               AppServices.settings.settings.networkControlsIpv6Preference,
             );
           },
-          saveSelection: (preference) {
+          saveIpv6Selection: (preference) {
             return AppServices.settings.setNetworkControlsIpv6Preference(
+              preference.name,
+            );
+          },
+          readSavedDnsSelection: () async {
+            return parseStoredDnsPreference(
+              AppServices.settings.settings.networkControlsDnsPreference,
+            );
+          },
+          saveDnsSelection: (preference) {
+            return AppServices.settings.setNetworkControlsDnsPreference(
               preference.name,
             );
           },
@@ -135,6 +151,55 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
         _failureMessage = HumanMessage.fromProbeError(
           result.message ?? result.error,
           fallback: 'That change didn’t go through. Try again.',
+        );
+      }
+    });
+  }
+
+  Future<void> _flushDns() async {
+    if (_working || !_controller.supportsDns) return;
+
+    final confirmed = await showApplyNetworkChangesDialog(context);
+    if (confirmed != ApplyNetworkChangesResult.confirmed || !mounted) return;
+
+    setState(() {
+      _working = true;
+      _progressLabel = 'Flushing DNS…';
+      _successMessage = null;
+      _failureMessage = null;
+      _failureTechnical = null;
+    });
+
+    late final FixResult result;
+    try {
+      result = await _controller.flushDns(
+        onPhase: (phase) {
+          if (!mounted) return;
+          setState(() => _progressLabel = phase.label);
+        },
+      );
+    } on Object catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _working = false;
+        _failureTechnical = error.toString();
+        _failureMessage = HumanMessage.fromProbeError(
+          error.toString(),
+          fallback: 'Couldn’t flush DNS.',
+        );
+      });
+      return;
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _working = false;
+      if (result.success) {
+        _successMessage = result.message ?? 'DNS cache cleared.';
+      } else if (!result.wasCancelled) {
+        _failureMessage = HumanMessage.fromProbeError(
+          result.message ?? result.error,
+          fallback: 'Couldn’t flush DNS.',
         );
       }
     });
@@ -325,6 +390,66 @@ class _NetworkControlsPageState extends State<NetworkControlsPage> {
                                                   });
                                                 },
                                               ),
+                                            const Divider(
+                                              height: 1,
+                                              color: AppColors.outlineSubtle,
+                                            ),
+                                            const SizedBox(
+                                              height: AppSpacing.lg,
+                                            ),
+                                            Text(
+                                              'DNS resolver',
+                                              style:
+                                                  text.labelMedium?.copyWith(
+                                                color:
+                                                    AppColors.onSurfaceMuted,
+                                                fontWeight: FontWeight.w600,
+                                                letterSpacing: 0.2,
+                                              ),
+                                            ),
+                                            const SizedBox(
+                                              height: AppSpacing.sm,
+                                            ),
+                                            _DnsCurrentStateRow(
+                                              preference:
+                                                  _controller.detectedDns,
+                                              detail:
+                                                  _controller.dnsStatusDetail,
+                                            ),
+                                            const SizedBox(
+                                              height: AppSpacing.sm,
+                                            ),
+                                            for (final option
+                                                in DnsPreferenceLabels
+                                                    .selectableOptions)
+                                              _DnsPreferenceOption(
+                                                preference: option,
+                                                groupValue:
+                                                    _controller.selectedDns,
+                                                enabled: !_working &&
+                                                    _controller.supportsDns,
+                                                onSelected: () {
+                                                  setState(() {
+                                                    _controller
+                                                        .selectDns(option);
+                                                    _successMessage = null;
+                                                    _failureMessage = null;
+                                                    _failureTechnical = null;
+                                                  });
+                                                },
+                                              ),
+                                            const SizedBox(
+                                              height: AppSpacing.sm,
+                                            ),
+                                            SecondaryButton(
+                                              label: 'Flush DNS cache',
+                                              icon: Icons.cleaning_services_outlined,
+                                              expanded: true,
+                                              onPressed: (_working ||
+                                                      !_controller.supportsDns)
+                                                  ? null
+                                                  : _flushDns,
+                                            ),
                                             if (_working) ...[
                                               const SizedBox(
                                                 height: AppSpacing.md,
@@ -640,6 +765,167 @@ class _CurrentStateRow extends StatelessWidget {
             ),
           ],
         ],
+      ),
+    );
+  }
+}
+
+class _DnsCurrentStateRow extends StatelessWidget {
+  const _DnsCurrentStateRow({
+    required this.preference,
+    this.detail,
+  });
+
+  final DnsPreference preference;
+  final String? detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    final tone = switch (preference) {
+      DnsPreference.automatic => StatusBadgeTone.success,
+      DnsPreference.cloudflare => StatusBadgeTone.info,
+      DnsPreference.unknown => StatusBadgeTone.neutral,
+    };
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpacing.md),
+      decoration: BoxDecoration(
+        color: AppColors.surfaceLow.withValues(alpha: 0.65),
+        borderRadius: AppRadius.smAll,
+        border: Border.all(color: AppColors.outlineSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Text(
+                'DNS current',
+                style: text.labelSmall?.copyWith(
+                  color: AppColors.onSurfaceMuted,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const Spacer(),
+              StatusBadge(label: preference.statusLabel, tone: tone),
+            ],
+          ),
+          if (detail != null && detail!.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.xs),
+            Text(
+              detail!,
+              style: text.bodySmall?.copyWith(
+                color: AppColors.onSurfaceVariant,
+                height: 1.35,
+              ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _DnsPreferenceOption extends StatefulWidget {
+  const _DnsPreferenceOption({
+    required this.preference,
+    required this.groupValue,
+    required this.enabled,
+    required this.onSelected,
+  });
+
+  final DnsPreference preference;
+  final DnsPreference? groupValue;
+  final bool enabled;
+  final VoidCallback onSelected;
+
+  @override
+  State<_DnsPreferenceOption> createState() => _DnsPreferenceOptionState();
+}
+
+class _DnsPreferenceOptionState extends State<_DnsPreferenceOption> {
+  var _hovered = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final text = AppTypography.textTheme;
+    final enabled = widget.enabled;
+    final selected = widget.groupValue == widget.preference;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.xs),
+      child: MouseRegion(
+        onEnter: enabled ? (_) => setState(() => _hovered = true) : null,
+        onExit: enabled ? (_) => setState(() => _hovered = false) : null,
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: enabled ? widget.onSelected : null,
+            borderRadius: AppRadius.smAll,
+            hoverColor: Colors.transparent,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 160),
+              curve: Curves.easeOutCubic,
+              padding: const EdgeInsets.symmetric(
+                horizontal: AppSpacing.sm,
+                vertical: AppSpacing.xs,
+              ),
+              decoration: BoxDecoration(
+                color: selected
+                    ? AppColors.primary.withValues(alpha: 0.1)
+                    : _hovered
+                        ? AppColors.surfaceHigh.withValues(alpha: 0.5)
+                        : Colors.transparent,
+                borderRadius: AppRadius.smAll,
+                border: Border.all(
+                  color: selected
+                      ? AppColors.primary.withValues(alpha: 0.45)
+                      : AppColors.outlineSubtle,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    selected
+                        ? Icons.radio_button_checked_rounded
+                        : Icons.radio_button_off_rounded,
+                    size: AppSpacing.iconInline,
+                    color: selected
+                        ? AppColors.primary
+                        : AppColors.onSurfaceMuted,
+                  ),
+                  const SizedBox(width: AppSpacing.sm),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.preference.optionLabel,
+                          style: text.titleSmall?.copyWith(
+                            fontWeight:
+                                selected ? FontWeight.w600 : FontWeight.w500,
+                          ),
+                        ),
+                        if (widget.preference.optionDescription != null) ...[
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.preference.optionDescription!,
+                            style: text.bodySmall?.copyWith(
+                              color: AppColors.onSurfaceVariant,
+                              height: 1.35,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

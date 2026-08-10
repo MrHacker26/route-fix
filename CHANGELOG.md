@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Flush DNS and Cloudflare DNS preset (1.1.1.1 / 1.0.0.1) with restore on macOS, Windows, and Linux
+- DNS resolver controls in Network Controls (Automatic / Cloudflare, flush cache)
+
+### Changed
+
+- Auto Fix catalog: Flush DNS and Use Cloudflare DNS are available (admin required) instead of Coming soon
+
 ## [1.1.0] - 2026-07-23
 
 ### Added

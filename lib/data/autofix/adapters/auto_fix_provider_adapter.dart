@@ -61,6 +61,16 @@ final class AutoFixProviderAdapter extends PlatformFixProvider {
             supportedPlatforms: action.supportedPlatforms,
             relatedIssueCodes: action.relatedIssueCodes,
           )
+        else if (action.kind == FixActionKind.flushDns ||
+            action.kind == FixActionKind.changeDnsCloudflare)
+          FixAction(
+            kind: action.kind,
+            title: action.title,
+            description: action.description,
+            availability: FixAvailability.requiresElevation,
+            supportedPlatforms: action.supportedPlatforms,
+            relatedIssueCodes: action.relatedIssueCodes,
+          )
         else
           action,
     ];

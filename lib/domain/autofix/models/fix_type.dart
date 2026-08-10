@@ -11,11 +11,14 @@ enum FixType {
   /// Restore default network configuration for previously applied fixes.
   restoreDefault,
 
-  /// Future: clear local DNS caches.
+  /// Clear local DNS caches.
   flushDnsCache,
 
-  /// Future: point resolvers at Cloudflare DNS.
+  /// Point resolvers at Cloudflare DNS (with restore support).
   changeDnsCloudflare,
+
+  /// Restore DNS from [DnsBackupCodec] metadata — not shown in the public catalog.
+  restoreDns,
 
   /// Future: launch Cloudflare WARP if installed.
   enableWarp,
@@ -36,6 +39,7 @@ extension FixActionKindMapping on FixActionKind {
         FixActionKind.disableIpv6 => FixType.preferIpv4,
         FixActionKind.enableIpv6 => FixType.restoreDefault,
         FixActionKind.flushDns => FixType.flushDnsCache,
+        FixActionKind.changeDnsCloudflare => FixType.changeDnsCloudflare,
         FixActionKind.openWarp => FixType.enableWarp,
       };
 }
@@ -46,8 +50,9 @@ extension FixTypeCatalogMapping on FixType {
         FixType.preferIpv4 => FixActionKind.disableIpv6,
         FixType.restoreDefault => FixActionKind.enableIpv6,
         FixType.flushDnsCache => FixActionKind.flushDns,
+        FixType.changeDnsCloudflare => FixActionKind.changeDnsCloudflare,
         FixType.enableWarp => FixActionKind.openWarp,
-        FixType.changeDnsCloudflare ||
+        FixType.restoreDns ||
         FixType.renewDhcpLease ||
         FixType.restartNetworkInterface ||
         FixType.resetNetworkStack =>
@@ -60,6 +65,7 @@ extension FixTypeCatalogMapping on FixType {
         FixType.restoreDefault => 'Restore defaults',
         FixType.flushDnsCache => 'Flush DNS',
         FixType.changeDnsCloudflare => 'Use Cloudflare DNS',
+        FixType.restoreDns => 'Restore DNS',
         FixType.enableWarp => 'Open WARP',
         FixType.renewDhcpLease => 'Renew DHCP',
         FixType.restartNetworkInterface => 'Restart interface',
