@@ -43,7 +43,7 @@ Alternatively: **System Settings → Privacy & Security → Open Anyway**.
 
 ### Admin password
 
-**Prefer IPv4**, **Restore defaults**, and some **Auto Fix** actions may ask for your macOS administrator password.
+**Prefer IPv4**, **Restore defaults**, **Flush DNS**, **Cloudflare DNS**, and other **Auto Fix** actions may ask for your macOS administrator password.
 
 ---
 
@@ -75,7 +75,7 @@ Alternatively: **System Settings → Privacy & Security → Open Anyway**.
 
 ### Admin / UAC
 
-Network changes may show a **UAC** prompt (“Do you want to allow this app to make changes?”). Choose **Yes** to apply Prefer IPv4 or Restore defaults.
+Network changes may show a **UAC** prompt (“Do you want to allow this app to make changes?”). Choose **Yes** to apply Prefer IPv4, DNS changes, flush DNS, or Restore defaults.
 
 ---
 
@@ -131,7 +131,7 @@ Then refresh the menu (log out/in, or run `update-desktop-database ~/.local/shar
 
 ### Admin password
 
-Prefer IPv4 and Restore defaults use **`pkexec`** (PolicyKit) on most desktop distros. Approve the prompt and enter your password when asked.
+Prefer IPv4, DNS changes, flush DNS, and Restore defaults use **`pkexec`** (PolicyKit) on most desktop distros. Approve the prompt and enter your password when asked.
 
 ---
 
@@ -169,6 +169,7 @@ RouteFix settings are stored under your user profile (for example `~/Library/App
 | macOS won’t open the app | Right-click → Open, or allow in Privacy & Security |
 | Windows SmartScreen warning | Expected for unsigned builds; use “More info → Run anyway” if you trust the release |
 | Linux `permission denied` | `chmod +x route_fix` inside `bundle/` |
-| Fix asks for password | Required for network preference changes — same as changing system network settings manually |
+| Fix asks for password | Required for network/DNS changes — same as changing system network settings manually |
+| DNS didn’t change after Apply | VPN, corporate policy, or NetworkManager may override; use **Restore defaults** or revert in system settings |
 
 Report bugs: [GitHub Issues](https://github.com/MrHacker26/route-fix/issues)

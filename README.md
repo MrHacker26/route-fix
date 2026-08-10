@@ -32,8 +32,8 @@
 
 - DNS, IPv4/IPv6, HTTPS, GitHub, PyPI, and Cloudflare probes
 - Evidence-gated recommendations (no invented metrics)
-- Prefer IPv4 Auto Fix + Restore Defaults (admin required)
-- Network Controls for manual IPv6 preference
+- Prefer IPv4 Auto Fix, Flush DNS, Cloudflare DNS preset + Restore Defaults (admin required)
+- Network Controls for IPv6 preference and DNS (Automatic / Cloudflare, flush cache)
 - Dark Material 3 UI
 
 ---
@@ -83,7 +83,7 @@ Production packaging, installers, AppImage, and release tagging: [`docs/BUILD.md
 1. Probe public endpoints (DNS / TCP / HTTPS)
 2. Score health and list issues with evidence
 3. Recommend fixes only when confidence is high
-4. Optionally apply Prefer IPv4 (admin password required)
+4. Optionally apply fixes (Prefer IPv4, flush DNS, Cloudflare DNS) — admin password when required
 
 ---
 
