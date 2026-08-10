@@ -6,7 +6,6 @@ import 'package:route_fix/domain/autofix/models/fix_result.dart';
 import 'package:route_fix/domain/autofix/models/fix_type.dart';
 import 'package:route_fix/domain/autofix/platform_fix_executor.dart';
 import 'package:route_fix/domain/autofix/shell_command_executor.dart';
-import 'package:route_fix/features/network_controls/dns_preference.dart';
 import 'package:route_fix/features/network_controls/dns_preference_probe.dart';
 import 'package:route_fix/features/network_controls/ipv6_preference.dart';
 import 'package:route_fix/features/network_controls/ipv6_preference_probe.dart';

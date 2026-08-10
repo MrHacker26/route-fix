@@ -13,11 +13,9 @@ final class LinuxPlatformFixExecutor implements PlatformFixExecutor {
     required ShellCommandExecutor shell,
     LinuxPrivilegedSysctl? privileged,
     LinuxDnsFixOperations? dns,
-  })  : _shell = shell,
-        _privileged = privileged ?? LinuxPrivilegedSysctl(shell: shell),
+  })  : _privileged = privileged ?? LinuxPrivilegedSysctl(shell: shell),
         _dns = dns ?? LinuxDnsFixOperations(shell: shell);
 
-  final ShellCommandExecutor _shell;
   final LinuxPrivilegedSysctl _privileged;
   final LinuxDnsFixOperations _dns;
 

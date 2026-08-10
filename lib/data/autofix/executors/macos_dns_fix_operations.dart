@@ -2,7 +2,6 @@ import '../../../domain/autofix/dns_presets.dart';
 import '../../../domain/autofix/exceptions/auto_fix_exception.dart';
 import '../../../domain/autofix/models/fix_action.dart';
 import '../../../domain/autofix/models/fix_result.dart';
-import '../../../domain/autofix/models/fix_type.dart';
 import '../../../domain/autofix/shell_command_executor.dart';
 import '../dns/dns_backup_codec.dart';
 import 'macos_privileged_networksetup.dart';

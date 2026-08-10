@@ -15,11 +15,9 @@ final class WindowsPlatformFixExecutor implements PlatformFixExecutor {
     required ShellCommandExecutor shell,
     WindowsPrivilegedPowerShell? privileged,
     WindowsDnsFixOperations? dns,
-  })  : _shell = shell,
-        _privileged = privileged ?? WindowsPrivilegedPowerShell(shell: shell),
-        _dns = dns ?? WindowsDnsFixOperations(shell: shell, privileged: privileged);
+  })  : _privileged = privileged ?? WindowsPrivilegedPowerShell(shell: shell),
+        _dns = dns ?? WindowsDnsFixOperations(shell: shell);
 
-  final ShellCommandExecutor _shell;
   final WindowsPrivilegedPowerShell _privileged;
   final WindowsDnsFixOperations _dns;
 
